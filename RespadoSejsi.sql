@@ -1,10 +1,3 @@
--- --------------------------------------------------------
--- Host:                         127.0.0.1
--- Versión del servidor:         8.4.3 - MySQL Community Server - GPL
--- SO del servidor:              Win64
--- HeidiSQL Versión:             12.8.0.6908
--- --------------------------------------------------------
-
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET NAMES utf8 */;
 /*!50503 SET NAMES utf8mb4 */;
@@ -14,20 +7,22 @@
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
--- Volcando estructura para procedimiento multiconsultorio.sp_auth_get_personal
+CREATE DATABASE IF NOT EXISTS `multiconsultorio` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+USE `multiconsultorio`;
+
 DELIMITER //
 CREATE PROCEDURE `sp_auth_get_personal`(IN p_identity VARCHAR(100))
 BEGIN
     SELECT p.id_personal,
-                 p.nombres,
-                 p.apellido_paterno,
-                 p.apellido_materno,
-                 p.correo,
-                 p.ci,
-                 p.contrasena,
-                 p.foto_perfil,
-                 r.id_rol,
-                 r.nombre_rol
+           p.nombres,
+           p.apellido_paterno,
+           p.apellido_materno,
+           p.correo,
+           p.ci,
+           p.contrasena,
+           p.foto_perfil,
+           r.id_rol,
+           r.nombre_rol
     FROM tpersonal p
     INNER JOIN trol r ON r.id_rol = p.id_rol
     WHERE (p.correo = p_identity OR p.ci = p_identity)
@@ -37,7 +32,21 @@ BEGIN
 END//
 DELIMITER ;
 
--- Volcando estructura para procedimiento multiconsultorio.sp_pac_actualizar
+DELIMITER //
+CREATE PROCEDURE `sp_especialidad_listar`()
+BEGIN
+  SELECT 
+    id_especialidad,
+    nombre,
+    descripcion,
+    estado,
+    fecha_creacion
+  FROM tespecialidad
+  WHERE estado = TRUE
+  ORDER BY nombre ASC;
+END//
+DELIMITER ;
+
 DELIMITER //
 CREATE PROCEDURE `sp_pac_actualizar`(
     IN p_id_paciente CHAR(36),
@@ -139,7 +148,31 @@ BEGIN
 END//
 DELIMITER ;
 
--- Volcando estructura para procedimiento multiconsultorio.sp_pac_listar
+DELIMITER //
+CREATE PROCEDURE `sp_pac_buscar`(IN p_termino_busqueda VARCHAR(100), IN p_solo_activos BOOLEAN)
+BEGIN
+    SELECT
+        id_paciente,
+        codigo_paciente,
+        nombre,
+        apellido_paterno,
+        apellido_materno,
+        ci,
+        celular,
+        correo,
+        estado
+    FROM tpaciente
+    WHERE (p_solo_activos = FALSE OR estado = TRUE)
+        AND (
+            LOWER(ci) LIKE CONCAT('%', LOWER(p_termino_busqueda), '%')
+            OR LOWER(CONCAT(nombre, ' ', apellido_paterno, ' ', COALESCE(apellido_materno, ''))) LIKE CONCAT('%', LOWER(p_termino_busqueda), '%')
+            OR LOWER(codigo_paciente) LIKE CONCAT('%', LOWER(p_termino_busqueda), '%')
+        )
+    ORDER BY nombre, apellido_paterno
+    LIMIT 20;
+END//
+DELIMITER ;
+
 DELIMITER //
 CREATE PROCEDURE `sp_pac_listar`(
     IN p_filtro VARCHAR(20)
@@ -192,7 +225,6 @@ BEGIN
 END//
 DELIMITER ;
 
--- Volcando estructura para procedimiento multiconsultorio.sp_pac_obtener_por_id
 DELIMITER //
 CREATE PROCEDURE `sp_pac_obtener_por_id`(
     IN p_id_paciente CHAR(36)
@@ -215,14 +247,16 @@ BEGIN
         observaciones,
         celular,
         correo,
-        codigo_paciente
+        codigo_paciente,
+        estado,
+        fecha_creacion,
+        fecha_actualizacion
     FROM tpaciente
-    WHERE id_paciente = p_id_paciente AND estado = TRUE
+    WHERE id_paciente = p_id_paciente
     LIMIT 1;
 END//
 DELIMITER ;
 
--- Volcando estructura para procedimiento multiconsultorio.sp_pac_registrar
 DELIMITER //
 CREATE PROCEDURE `sp_pac_registrar`(
     IN p_nombre VARCHAR(60),
@@ -369,7 +403,279 @@ BEGIN
 END//
 DELIMITER ;
 
--- Volcando estructura para tabla multiconsultorio.taseguradora
+DELIMITER //
+CREATE PROCEDURE `sp_pac_toggle_estado`(
+    IN p_id_paciente CHAR(36),
+    OUT p_nuevo_estado BOOLEAN,
+    OUT p_success BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_existe INT DEFAULT 0;
+    DECLARE v_estado_actual BOOLEAN;
+    
+    SET p_success = FALSE;
+    SET p_mensaje = '';
+    SET p_nuevo_estado = NULL;
+
+    -- Verificar que el paciente existe
+    SELECT COUNT(*) INTO v_existe
+    FROM tpaciente
+    WHERE id_paciente = p_id_paciente;
+
+    IF v_existe = 0 THEN
+        SET p_mensaje = 'El paciente no existe.';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El paciente no existe.';
+    END IF;
+
+    -- Obtener estado actual
+    SELECT estado INTO v_estado_actual
+    FROM tpaciente
+    WHERE id_paciente = p_id_paciente
+    LIMIT 1;
+
+    -- Toggle del estado
+    SET p_nuevo_estado = NOT v_estado_actual;
+    
+    UPDATE tpaciente
+    SET estado = p_nuevo_estado
+    WHERE id_paciente = p_id_paciente;
+
+    SET p_success = TRUE;
+    
+    IF p_nuevo_estado THEN
+        SET p_mensaje = 'Paciente activado exitosamente.';
+    ELSE
+        SET p_mensaje = 'Paciente desactivado. No podrá generar nuevas citas.';
+    END IF;
+
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_actualizar`(
+  IN p_id_personal VARCHAR(36),
+  IN p_ci VARCHAR(20),
+  IN p_nombres VARCHAR(100),
+  IN p_apellido_paterno VARCHAR(100),
+  IN p_apellido_materno VARCHAR(100),
+  IN p_cargo VARCHAR(100),
+  IN p_id_rol VARCHAR(36),
+  IN p_fecha_nacimiento DATE,
+  IN p_fecha_contratacion DATE,
+  IN p_domicilio TEXT,
+  IN p_celular VARCHAR(20),
+  IN p_correo VARCHAR(100),
+  IN p_foto_perfil VARCHAR(255),
+  IN p_archivo_contrato VARCHAR(255),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al actualizar el personal';
+  END;
+
+  -- Validar que el personal existe
+  IF NOT EXISTS (SELECT 1 FROM tpersonal WHERE id_personal = p_id_personal) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Personal no encontrado';
+  ELSE
+    -- Actualizar personal
+    UPDATE tpersonal SET
+      ci = p_ci,
+      nombres = p_nombres,
+      apellido_paterno = p_apellido_paterno,
+      apellido_materno = p_apellido_materno,
+      cargo = p_cargo,
+      id_rol = p_id_rol,
+      fecha_nacimiento = p_fecha_nacimiento,
+      fecha_contratacion = p_fecha_contratacion,
+      domicilio = p_domicilio,
+      celular = p_celular,
+      correo = p_correo,
+      foto_perfil = COALESCE(p_foto_perfil, foto_perfil),
+      archivo_contrato = COALESCE(p_archivo_contrato, archivo_contrato),
+      fecha_actualizacion = NOW()
+    WHERE id_personal = p_id_personal;
+
+    SET p_success = TRUE;
+    SET p_msg = 'Personal actualizado correctamente';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_listar`()
+BEGIN
+  SELECT 
+    p.id_personal,
+    p.ci,
+    p.nombres,
+    p.apellido_paterno,
+    p.apellido_materno,
+    p.cargo,
+    p.correo,
+    p.celular,
+    p.estado,
+    p.fecha_creacion,
+    r.nombre_rol
+  FROM tpersonal p
+  LEFT JOIN trol r ON p.id_rol = r.id_rol
+  ORDER BY p.fecha_creacion DESC;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_listar_medicos`()
+BEGIN
+  SELECT 
+    p.id_personal,
+    p.nombres,
+    p.apellido_paterno,
+    p.apellido_materno,
+    p.cargo,
+    p.correo,
+    p.celular,
+    p.foto_perfil,
+    r.nombre_rol,
+    GROUP_CONCAT(e.nombre SEPARATOR ', ') AS especialidades
+  FROM tpersonal p
+  LEFT JOIN trol r ON p.id_rol = r.id_rol
+  LEFT JOIN tpersonal_especialidad pe ON p.id_personal = pe.id_personal AND pe.estado = TRUE
+  LEFT JOIN tespecialidad e ON pe.id_especialidad = e.id_especialidad AND e.estado = TRUE
+  WHERE r.nombre_rol = 'medico' AND p.estado = TRUE
+  GROUP BY p.id_personal
+  ORDER BY p.apellido_paterno ASC;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_obtener_medico`(
+  IN p_id_personal VARCHAR(36)
+)
+BEGIN
+  SELECT 
+    p.id_personal,
+    p.nombres,
+    p.apellido_paterno,
+    p.apellido_materno,
+    p.correo,
+    p.celular,
+    p.domicilio,
+    p.foto_perfil,
+    p.cargo,
+    r.nombre_rol,
+    GROUP_CONCAT(e.nombre SEPARATOR ', ') AS especialidades
+  FROM tpersonal p
+  LEFT JOIN trol r ON p.id_rol = r.id_rol
+  LEFT JOIN tpersonal_especialidad pe ON p.id_personal = pe.id_personal AND pe.estado = TRUE
+  LEFT JOIN tespecialidad e ON pe.id_especialidad = e.id_especialidad AND e.estado = TRUE
+  WHERE p.id_personal = p_id_personal AND r.nombre_rol = 'medico' AND p.estado = TRUE
+  GROUP BY p.id_personal;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_obtener_por_id`(
+  IN p_id_personal VARCHAR(36)
+)
+BEGIN
+  SELECT 
+    id_personal,
+    ci,
+    nombres,
+    apellido_paterno,
+    apellido_materno,
+    cargo,
+    id_rol,
+    fecha_nacimiento,
+    fecha_contratacion,
+    domicilio,
+    celular,
+    correo,
+    foto_perfil,
+    archivo_contrato,
+    estado,
+    fecha_creacion,
+    fecha_actualizacion
+  FROM tpersonal
+  WHERE id_personal = p_id_personal;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_obtener_sesion`(
+  IN p_id_personal VARCHAR(36)
+)
+BEGIN
+  SELECT 
+    p.id_personal,
+    p.nombres,
+    p.apellido_paterno,
+    p.apellido_materno,
+    p.especialidad,
+    p.cargo,
+    p.correo,
+    p.celular,
+    p.foto_perfil,
+    r.nombre_rol
+  FROM tpersonal p
+  LEFT JOIN trol r ON p.id_rol = r.id_rol
+  WHERE p.id_personal = p_id_personal;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_personal_registrar`(
+    IN p_ci VARCHAR(20),
+    IN p_nombres VARCHAR(60),
+    IN p_apellido_paterno VARCHAR(60),
+    IN p_apellido_materno VARCHAR(60),
+    IN p_cargo VARCHAR(40),
+    IN p_id_rol CHAR(36),
+    IN p_fecha_nacimiento DATE,
+    IN p_fecha_contratacion DATE,
+    IN p_domicilio VARCHAR(255),
+    IN p_celular VARCHAR(20),
+    IN p_correo VARCHAR(100),
+    IN p_contrasena VARCHAR(255),
+    IN p_foto_perfil VARCHAR(200),
+    IN p_archivo_contrato VARCHAR(200),
+    OUT p_id_personal CHAR(36),
+    OUT p_success BOOLEAN,
+    OUT p_msg VARCHAR(255)
+)
+BEGIN
+    DECLARE v_ci_existe INT;
+    
+    -- Validar CI único
+    SELECT COUNT(*) INTO v_ci_existe FROM tpersonal WHERE ci = p_ci;
+    
+    IF v_ci_existe > 0 THEN
+        SET p_success = FALSE;
+        SET p_msg = 'El CI ya está registrado en el sistema.';
+    ELSE
+        -- Insertar personal
+        INSERT INTO tpersonal (
+            ci, nombres, apellido_paterno, apellido_materno, cargo, id_rol,
+            fecha_nacimiento, fecha_contratacion, domicilio, celular, correo,
+            contrasena, foto_perfil, archivo_contrato, estado
+        ) VALUES (
+            p_ci, p_nombres, p_apellido_paterno, p_apellido_materno, p_cargo, p_id_rol,
+            p_fecha_nacimiento, p_fecha_contratacion, p_domicilio, p_celular, p_correo,
+            p_contrasena, p_foto_perfil, p_archivo_contrato, TRUE
+        );
+        
+        SET p_id_personal = LAST_INSERT_ID();
+        SET p_success = TRUE;
+        SET p_msg = 'Personal registrado exitosamente.';
+    END IF;
+END//
+DELIMITER ;
+
 CREATE TABLE IF NOT EXISTS `taseguradora` (
   `id_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `nombre` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -386,9 +692,7 @@ CREATE TABLE IF NOT EXISTS `taseguradora` (
   CONSTRAINT `taseguradora_chk_1` CHECK ((`porcentaje_cobertura` between 0 and 100))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.taseguradora: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tcita
 CREATE TABLE IF NOT EXISTS `tcita` (
   `id_cita` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -413,9 +717,7 @@ CREATE TABLE IF NOT EXISTS `tcita` (
   CONSTRAINT `FK_cita_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tcita: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tdetalle_factura_aseguradora
 CREATE TABLE IF NOT EXISTS `tdetalle_factura_aseguradora` (
   `id_detalle_aseg` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_factura_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -433,9 +735,7 @@ CREATE TABLE IF NOT EXISTS `tdetalle_factura_aseguradora` (
   CONSTRAINT `FK_dfa_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tdetalle_factura_aseguradora: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tdetalle_factura_cliente
 CREATE TABLE IF NOT EXISTS `tdetalle_factura_cliente` (
   `id_detalle_cliente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_factura_cliente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -453,9 +753,7 @@ CREATE TABLE IF NOT EXISTS `tdetalle_factura_cliente` (
   CONSTRAINT `FK_dfc_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tdetalle_factura_cliente: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tespecialidad
 CREATE TABLE IF NOT EXISTS `tespecialidad` (
   `id_especialidad` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `nombre` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -466,9 +764,13 @@ CREATE TABLE IF NOT EXISTS `tespecialidad` (
   UNIQUE KEY `nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tespecialidad: ~0 rows (aproximadamente)
+INSERT INTO `tespecialidad` (`id_especialidad`, `nombre`, `descripcion`, `fecha_creacion`, `estado`) VALUES
+	('840a94ea-d884-11f0-81b0-40c2ba62ef61', 'Cardiología', 'Especialista en enfermedades del corazón', '2025-12-13 20:33:31', 1),
+	('840aa3d8-d884-11f0-81b0-40c2ba62ef61', 'Dermatología', 'Especialista en enfermedades de la piel', '2025-12-13 20:33:31', 1),
+	('840aa712-d884-11f0-81b0-40c2ba62ef61', 'Pediatría', 'Especialista en atención de niños', '2025-12-13 20:33:31', 1),
+	('840aa926-d884-11f0-81b0-40c2ba62ef61', 'Neurología', 'Especialista en el sistema nervioso', '2025-12-13 20:33:31', 1),
+	('840aab7f-d884-11f0-81b0-40c2ba62ef61', 'Psiquiatría', 'Especialista en salud mental', '2025-12-13 20:33:31', 1);
 
--- Volcando estructura para tabla multiconsultorio.testudio
 CREATE TABLE IF NOT EXISTS `testudio` (
   `id_estudio` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_historial` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -484,9 +786,7 @@ CREATE TABLE IF NOT EXISTS `testudio` (
   CONSTRAINT `FK_estudio_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.testudio: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tfactura_aseguradora
 CREATE TABLE IF NOT EXISTS `tfactura_aseguradora` (
   `id_factura_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_cita` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -506,9 +806,7 @@ CREATE TABLE IF NOT EXISTS `tfactura_aseguradora` (
   CONSTRAINT `FK_fa_cita` FOREIGN KEY (`id_cita`) REFERENCES `tcita` (`id_cita`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tfactura_aseguradora: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tfactura_cliente
 CREATE TABLE IF NOT EXISTS `tfactura_cliente` (
   `id_factura_cliente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_cita` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -529,9 +827,7 @@ CREATE TABLE IF NOT EXISTS `tfactura_cliente` (
   CONSTRAINT `FK_fc_paciente` FOREIGN KEY (`id_paciente`) REFERENCES `tpaciente` (`id_paciente`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tfactura_cliente: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.thistorial_paciente
 CREATE TABLE IF NOT EXISTS `thistorial_paciente` (
   `id_historial` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -550,9 +846,7 @@ CREATE TABLE IF NOT EXISTS `thistorial_paciente` (
   CONSTRAINT `FK_historial_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.thistorial_paciente: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.thorario
 CREATE TABLE IF NOT EXISTS `thorario` (
   `id_horario` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `dia_semana` tinyint NOT NULL,
@@ -565,9 +859,7 @@ CREATE TABLE IF NOT EXISTS `thorario` (
   CONSTRAINT `thorario_chk_1` CHECK ((`dia_semana` between 1 and 7))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.thorario: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tpaciente
 CREATE TABLE IF NOT EXISTS `tpaciente` (
   `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `nombre` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -594,12 +886,11 @@ CREATE TABLE IF NOT EXISTS `tpaciente` (
   UNIQUE KEY `codigo_paciente` (`codigo_paciente`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tpaciente: ~22 rows (aproximadamente)
 INSERT INTO `tpaciente` (`id_paciente`, `nombre`, `apellido_paterno`, `apellido_materno`, `fecha_nacimiento`, `ci`, `estado_civil`, `domicilio`, `nacionalidad`, `tipo_sangre`, `alergias`, `contacto_emerg`, `enfermedad_base`, `observaciones`, `celular`, `correo`, `codigo_paciente`, `estado`, `fecha_creacion`, `fecha_actualizacion`) VALUES
 	('03fb938c-d864-11f0-9531-40c2ba62ef61', 'prueba123', 'jasdjo', 'aosdjas', '2002-02-25', '123124', 'Viudo/a', NULL, 'brasileño', 'B+', NULL, 'nose', NULL, NULL, '54641216s', 'asd@jfksd.com', 'PAC-20251213-63710', 1, '2025-12-13 16:40:52', NULL),
-	('958f8df6-d860-11f0-9531-40c2ba62ef61', 'Juanito Canchero mod por vent', 'Flores', 'Del prado', '1996-07-30', '965548', 'Divorciado/a', NULL, 'Cubano', 'A-', NULL, NULL, NULL, NULL, '75584213', 'juanito@papilla.com', 'PAC-20251213-11324', 1, '2025-12-13 16:16:18', '2025-12-13 16:36:18'),
+	('958f8df6-d860-11f0-9531-40c2ba62ef61', 'Juanito Canchero mod por vent', 'Flores', 'Del prado', '1996-07-30', '965548', 'Divorciado/a', NULL, 'Cubano', 'A-', NULL, NULL, NULL, NULL, '75584213', 'juanito@papilla.com', 'PAC-20251213-11324', 0, '2025-12-13 16:16:18', '2025-12-13 18:07:59'),
 	('ab57c083-d864-11f0-9531-40c2ba62ef61', 'María Elena', 'García', 'López', '1985-06-15', '1234567', 'Casada', 'Av. Ballivián #123, Zona Sopocachi', 'Boliviana', 'O+', 'Penicilina, Polen', 'Carlos García - 71234567', 'Hipertensión leve', 'Control cada 6 meses', '59171234567', 'maria.garcia@email.com', 'PAC-20241201-00123', 1, '2025-12-13 16:45:33', '2025-12-13 17:03:01'),
-	('ab57cd83-d864-11f0-9531-40c2ba62ef61', 'Juan Carlos', 'Rodríguez', 'Pérez', '1990-03-22', '2345678', 'Soltero', 'Calle Murillo #456, Zona Sur', 'Boliviana', 'A+', 'Mariscos', 'Ana Rodríguez - 72234567', 'Ninguna', 'Primera consulta', '59172234567', 'juan.rodriguez@email.com', 'PAC-20241201-00234', 0, '2025-12-13 16:45:33', '2025-12-13 16:56:40'),
+	('ab57cd83-d864-11f0-9531-40c2ba62ef61', 'Juan Carlos', 'Rodríguez', 'Pérez', '1990-03-22', '2345678', 'Soltero', 'Calle Murillo #456, Zona Sur', 'Boliviana', 'A+', 'Mariscos', 'Ana Rodríguez - 72234567', 'Ninguna', 'Primera consulta', '59172234567', 'juan.rodriguez@email.com', 'PAC-20241201-00234', 1, '2025-12-13 16:45:33', '2025-12-13 18:07:51'),
 	('ab57d017-d864-11f0-9531-40c2ba62ef61', 'Ana Patricia', 'Martínez', 'González', '1978-11-05', '3456789', 'Divorciada', 'Av. Arce #789, Centro', 'Boliviana', 'B+', 'Ácaros del polvo', 'Pedro Martínez - 73234567', 'Diabetes tipo 2', 'Requiere control de glucosa', '59173234567', 'ana.martinez@email.com', 'PAC-20241201-00345', 0, '2025-12-13 16:45:33', '2025-12-13 16:59:21'),
 	('ab57d20c-d864-11f0-9531-40c2ba62ef61', 'Luis Alberto', 'Fernández', 'Silva', '1965-09-30', '4567890', 'Casado', 'Calle España #234, Miraflores', 'Boliviana', 'AB+', 'Ninguna', 'Carmen Fernández - 74234567', 'Artritis', 'Tratamiento continuo', '59174234567', 'luis.fernandez@email.com', 'PAC-20241201-00456', 1, '2025-12-13 16:45:33', NULL),
 	('ab57d3d9-d864-11f0-9531-40c2ba62ef61', 'Carolina', 'Vargas', 'Rojas', '1995-02-14', '5678901', 'Soltera', 'Av. Busch #567, Calacoto', 'Boliviana', 'O-', 'Lactosa', 'Miguel Vargas - 75234567', 'Asma', 'Usa inhalador', '59175234567', 'carolina.vargas@email.com', 'PAC-20241201-00567', 1, '2025-12-13 16:45:33', NULL),
@@ -619,7 +910,6 @@ INSERT INTO `tpaciente` (`id_paciente`, `nombre`, `apellido_paterno`, `apellido_
 	('ab580051-d864-11f0-9531-40c2ba62ef61', 'Ricardo', 'Gómez', 'Alvarez', '1972-12-12', '7788990', 'Casado', 'Calle Jordán #789, Sopocachi', 'Boliviana', 'B-', 'Ninguna', 'Silvia Gómez - 78234490', 'Apnea del sueño', 'Usa CPAP nocturno', '59178234490', 'ricardo.gomez@email.com', 'PAC-20241201-01901', 1, '2025-12-13 16:45:33', NULL),
 	('ab5802dd-d864-11f0-9531-40c2ba62ef61', 'Camila', 'Romero', 'Díaz', '1996-03-08', '8899001', 'Soltera', 'Av. Costanera #123, Achumani', 'Boliviana', 'A+', 'Antiinflamatorios', 'Pedro Romero - 79234501', 'Ninguna', 'Deportista profesional, chequeo anual', '59179234501', 'camila.romero@email.com', 'PAC-20241201-02012', 1, '2025-12-13 16:45:33', NULL);
 
--- Volcando estructura para tabla multiconsultorio.tpaciente_aseguradora
 CREATE TABLE IF NOT EXISTS `tpaciente_aseguradora` (
   `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `id_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -633,9 +923,7 @@ CREATE TABLE IF NOT EXISTS `tpaciente_aseguradora` (
   CONSTRAINT `FK_pa_paciente` FOREIGN KEY (`id_paciente`) REFERENCES `tpaciente` (`id_paciente`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tpaciente_aseguradora: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.tpersonal
 CREATE TABLE IF NOT EXISTS `tpersonal` (
   `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `ci` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -661,13 +949,13 @@ CREATE TABLE IF NOT EXISTS `tpersonal` (
   CONSTRAINT `FK_tpersonal_trol` FOREIGN KEY (`id_rol`) REFERENCES `trol` (`id_rol`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tpersonal: ~0 rows (aproximadamente)
 INSERT INTO `tpersonal` (`id_personal`, `ci`, `nombres`, `apellido_paterno`, `apellido_materno`, `cargo`, `id_rol`, `fecha_nacimiento`, `fecha_contratacion`, `domicilio`, `celular`, `correo`, `contrasena`, `foto_perfil`, `archivo_contrato`, `estado`, `fecha_creacion`, `fecha_actualizacion`) VALUES
-	('2821f798-d85b-11f0-9531-40c2ba62ef61', '675125', 'Jhoel Marvin', 'Limachi', 'Bonilla', 'Administrador', '0fe2336b-d854-11f0-9531-40c2ba62ef61', '2002-09-26', '2025-12-13', NULL, NULL, 'Jhoel@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', NULL, NULL, 1, '2025-12-13 15:37:27', NULL),
-	('33d3476d-d861-11f0-9531-40c2ba62ef61', '54654651', 'pepito', 'gonzales', NULL, 'ginecologo', '0fe2393a-d854-11f0-9531-40c2ba62ef61', '2025-12-13', NULL, NULL, NULL, 'pepito@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', NULL, NULL, 1, '2025-12-13 16:20:44', '2025-12-13 16:23:17'),
-	('401fc518-d85c-11f0-9531-40c2ba62ef61', '75875', 'jose armando', 'trujillo', 'guzman', 'unificador', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2025-12-13', NULL, NULL, NULL, 'juanito@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', NULL, NULL, 1, '2025-12-13 15:45:17', '2025-12-13 15:47:37');
+	('1ba0c06e-d88c-11f0-81b0-40c2ba62ef61', '123121', 'prueba foto', 'asd', 'asda', 'none', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '1991-11-30', '2010-01-01', 'asda', 'adsjnasdl', 'a@gmai.com', '$2a$10$jTReL0zmZcbnlFNjWQBXAeOT6XwPmLoXgp.KFrQ5OPGHpSTVI3O0a', '/uploads/personal/fotos/foto-1765676180798-996527428.jpg', NULL, 1, '2025-12-13 21:27:51', '2025-12-13 21:36:20'),
+	('2821f798-d85b-11f0-9531-40c2ba62ef61', '675125', 'Jhoel Marvin', 'Limachi', 'Bonilla', 'Administrador', '0fe2336b-d854-11f0-9531-40c2ba62ef61', '2002-09-26', '2025-12-13', NULL, NULL, 'Jhoel@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', '/uploads/personal/fotos/foto-1765675928282-918611041.jpg', NULL, 1, '2025-12-13 15:37:27', '2025-12-13 21:32:08'),
+	('33d3476d-d861-11f0-9531-40c2ba62ef61', '54654651', 'pepito', 'gonzales modeado', '', 'ginecologo', '0fe2336b-d854-11f0-9531-40c2ba62ef61', '2025-12-13', NULL, NULL, NULL, 'pepito@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', '/uploads/personal/fotos/foto-1765676317215-913481727.jpg', NULL, 1, '2025-12-13 16:20:44', '2025-12-13 21:38:37'),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', '75875', 'jose armando', 'modificadillo', 'guzman', 'unificador', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2025-12-13', NULL, NULL, NULL, 'juanito@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', '/uploads/personal/fotos/foto-1765675427553-391774339.jpg', NULL, 1, '2025-12-13 15:45:17', '2025-12-13 21:23:47'),
+	('69a37493-d87f-11f0-81b0-40c2ba62ef61', '6784411', 'Ignacio', 'Bocangel', '', 'Supervisor', '0fe2393a-d854-11f0-9531-40c2ba62ef61', '2004-05-16', '2014-08-21', 'Sopocachi', '74561511', 'Ignacio@gmail.com', '$2a$10$ZeP0iKiN/Y9VBLKQ/PC/x.eJNMWCfY3QRyOBLdNv92F6L6YEnK9MO', '/uploads/personal/fotos/foto-1765670219131-395354286.jpeg', '/uploads/personal/contratos/contrato-1765670219137-392840608.pdf', 1, '2025-12-13 19:56:59', NULL);
 
--- Volcando estructura para tabla multiconsultorio.tpersonal_especialidad
 CREATE TABLE IF NOT EXISTS `tpersonal_especialidad` (
   `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `id_especialidad` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -679,9 +967,10 @@ CREATE TABLE IF NOT EXISTS `tpersonal_especialidad` (
   CONSTRAINT `FK_pe_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tpersonal_especialidad: ~0 rows (aproximadamente)
+INSERT INTO `tpersonal_especialidad` (`id_personal`, `id_especialidad`, `fecha_asignacion`, `estado`) VALUES
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', '840a94ea-d884-11f0-81b0-40c2ba62ef61', '2025-12-13 20:38:30', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', '840aa712-d884-11f0-81b0-40c2ba62ef61', '2025-12-13 21:09:56', 1);
 
--- Volcando estructura para tabla multiconsultorio.tpersonal_horario
 CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
   `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `id_horario` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -693,9 +982,7 @@ CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
   CONSTRAINT `FK_ph_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tpersonal_horario: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.treceta
 CREATE TABLE IF NOT EXISTS `treceta` (
   `id_receta` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `id_historial` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -716,9 +1003,7 @@ CREATE TABLE IF NOT EXISTS `treceta` (
   CONSTRAINT `FK_receta_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.treceta: ~0 rows (aproximadamente)
 
--- Volcando estructura para tabla multiconsultorio.trol
 CREATE TABLE IF NOT EXISTS `trol` (
   `id_rol` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `nombre_rol` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -729,13 +1014,11 @@ CREATE TABLE IF NOT EXISTS `trol` (
   UNIQUE KEY `nombre_rol` (`nombre_rol`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.trol: ~0 rows (aproximadamente)
 INSERT INTO `trol` (`id_rol`, `nombre_rol`, `descripcion`, `estado`, `fecha_creacion`) VALUES
 	('0fe2336b-d854-11f0-9531-40c2ba62ef61', 'admin', 'Acceso completo al sistema', 1, '2025-12-13 14:50:27'),
 	('0fe2393a-d854-11f0-9531-40c2ba62ef61', 'ventanilla', 'Recepción y caja', 1, '2025-12-13 14:50:27'),
 	('0fe23b2d-d854-11f0-9531-40c2ba62ef61', 'medico', 'Gestión clínica', 1, '2025-12-13 14:50:27');
 
--- Volcando estructura para tabla multiconsultorio.tservicio
 CREATE TABLE IF NOT EXISTS `tservicio` (
   `id_servicio` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `nombre` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -747,7 +1030,6 @@ CREATE TABLE IF NOT EXISTS `tservicio` (
   UNIQUE KEY `nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Volcando datos para la tabla multiconsultorio.tservicio: ~0 rows (aproximadamente)
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

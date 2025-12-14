@@ -24,7 +24,7 @@ router.get('/pacientes/buscar', requireAuth, requireRole(['admin', 'ventanilla',
     let pacientes = [];
     
     if (termino.trim().length > 0) {
-      const [result] = await pool.query('CALL sp_pac_buscar(?)', [termino]);
+      const [result] = await pool.query('CALL sp_pac_buscar(?, ?)', [termino, true]);
       pacientes = Array.isArray(result) ? result[0] : result;
     }
     
