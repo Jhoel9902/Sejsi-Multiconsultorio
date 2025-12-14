@@ -1,0 +1,106 @@
+<% const role = (user.nombre_rol || '').toLowerCase();
+   const roleBadgeClass = role === 'admin' ? 'bg-success' : role === 'ventanilla' ? 'bg-warning text-dark' : 'bg-info text-dark';
+   const roleLabel = role === 'admin' ? 'Administrador' : role === 'ventanilla' ? 'Recepción' : 'Médico';
+   const roleAccent = role === 'admin' ? '#1abc9c' : role === 'ventanilla' ? '#f6c344' : '#4db2ff';
+%>
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card p-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <div>
+            <% if (user.foto_perfil) { %>
+              <img src="<%= user.foto_perfil %>" alt="Foto" 
+                style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid #1abc9c;" 
+                onerror="this.style.display='none'; document.querySelector('[data-dashboard-avatar]').style.display='flex';" />
+              <div data-dashboard-avatar style="width: 80px; height: 80px; border-radius: 50%; display: none; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; font-size: 32px;">
+                <%= (user.nombres && user.nombres[0]) ? user.nombres[0].toUpperCase() : 'U' %>
+              </div>
+            <% } else { %>
+              <div style="width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: bold; font-size: 32px;">
+                <%= (user.nombres && user.nombres[0]) ? user.nombres[0].toUpperCase() : 'U' %>
+              </div>
+            <% } %>
+          </div>
+          <div>
+            <div class="text-muted small">Bienvenido</div>
+            <h4 class="mb-1"><%= user.nombres %></h4>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="badge <%= roleBadgeClass %> badge-role"><%= user.nombre_rol %></span>
+              <span class="badge" style="background: <%= roleAccent %>;">Modo <%= roleLabel %></span>
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-primary btn-sm"><i class="bi bi-calendar-plus me-1"></i>Nueva cita</button>
+          <button class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Nuevo paciente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <% if (user.nombre_rol === 'admin') { %>
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="d-flex align-items-center mb-3">
+          <div class="rounded-circle me-3" style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background: rgba(26, 188, 156, 0.12); color:#0f9a6f;">
+            <i class="bi bi-people"></i>
+          </div>
+          <div>
+            <div class="fw-semibold">Administración</div>
+            <div class="text-muted small">Personal y catálogos</div>
+          </div>
+        </div>
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>Gestión de personal y roles</li>
+          <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>Servicios, especialidades, aseguradoras</li>
+          <li><i class="bi bi-check2 text-success me-1"></i>Reportes generales</li>
+        </ul>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (user.nombre_rol === 'ventanilla') { %>
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="d-flex align-items-center mb-3">
+          <div class="rounded-circle me-3" style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background: rgba(246, 195, 68, 0.18); color:#c58a00;">
+            <i class="bi bi-cash-coin"></i>
+          </div>
+          <div>
+            <div class="fw-semibold">Recepción y caja</div>
+            <div class="text-muted small">Pacientes y cobros</div>
+          </div>
+        </div>
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>Registro de pacientes</li>
+          <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>Programación de citas</li>
+          <li><i class="bi bi-check2 text-success me-1"></i>Facturación y recibos</li>
+        </ul>
+      </div>
+    </div>
+  <% } %>
+
+  <% if (user.nombre_rol === 'medico') { %>
+    <div class="col-md-4">
+      <div class="card p-3 h-100">
+        <div class="d-flex align-items-center mb-3">
+          <div class="rounded-circle me-3" style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; background: rgba(77, 178, 255, 0.15); color:#2f8bd8;">
+            <i class="bi bi-stethoscope"></i>
+          </div>
+          <div>
+            <div class="fw-semibold">Gestión clínica</div>
+            <div class="text-muted small">Agenda y evolución</div>
+          </div>
+        </div>
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>Agenda de citas</li>
+          <li class="mb-1"><i class="bi bi-check2 text-success me-1"></i>Historia clínica y estudios</li>
+          <li><i class="bi bi-check2 text-success me-1"></i>Recetas y órdenes</li>
+        </ul>
+      </div>
+    </div>
+  <% } %>
+</div>

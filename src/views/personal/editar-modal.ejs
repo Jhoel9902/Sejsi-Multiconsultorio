@@ -1,0 +1,104 @@
+<div class="modal-body p-4">
+  <form id="formEditarPersonal" enctype="multipart/form-data" class="needs-validation" novalidate>
+    <!-- Sección: Información Personal -->
+    <h6 class="mb-3 text-uppercase text-muted fw-semibold">
+      <i class="bi bi-person me-2"></i>Información Personal
+    </h6>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label">Cédula de Identidad <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" name="ci" value="<%= personal.ci %>" required />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Rol <span class="text-danger">*</span></label>
+        <select class="form-select" name="id_rol" required>
+          <% roles.forEach(r => { %>
+            <option value="<%= r.id_rol %>" <%= personal.id_rol === r.id_rol ? 'selected' : '' %>>
+              <%= r.nombre_rol %>
+            </option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Nombres <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" name="nombres" value="<%= personal.nombres %>" required />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Apellido Paterno <span class="text-danger">*</span></label>
+        <input type="text" class="form-control" name="apellido_paterno" value="<%= personal.apellido_paterno %>" required />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Apellido Materno</label>
+        <input type="text" class="form-control" name="apellido_materno" value="<%= personal.apellido_materno || '' %>" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Cargo</label>
+        <input type="text" class="form-control" name="cargo" value="<%= personal.cargo || '' %>" />
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- Sección: Contacto -->
+    <h6 class="mb-3 text-uppercase text-muted fw-semibold">
+      <i class="bi bi-telephone me-2"></i>Información de Contacto
+    </h6>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label">Correo Electrónico</label>
+        <input type="email" class="form-control" name="correo" value="<%= personal.correo || '' %>" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Teléfono</label>
+        <input type="tel" class="form-control" name="celular" value="<%= personal.celular || '' %>" />
+      </div>
+      <div class="col-12">
+        <label class="form-label">Domicilio</label>
+        <input type="text" class="form-control" name="domicilio" value="<%= personal.domicilio || '' %>" />
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- Sección: Datos Laborales -->
+    <h6 class="mb-3 text-uppercase text-muted fw-semibold">
+      <i class="bi bi-briefcase me-2"></i>Datos Laborales
+    </h6>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label">Fecha de Nacimiento</label>
+        <input type="date" class="form-control" name="fecha_nacimiento" value="<%= personal.fecha_nacimiento ? personal.fecha_nacimiento.toISOString().split('T')[0] : '' %>" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Fecha de Contratación</label>
+        <input type="date" class="form-control" name="fecha_contratacion" value="<%= personal.fecha_contratacion ? personal.fecha_contratacion.toISOString().split('T')[0] : '' %>" />
+      </div>
+    </div>
+
+    <hr />
+
+    <!-- Sección: Documentos -->
+    <h6 class="mb-3 text-uppercase text-muted fw-semibold">
+      <i class="bi bi-file-earmark me-2"></i>Documentos (Opcional)
+    </h6>
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <label class="form-label">Foto de Perfil</label>
+        <input type="file" class="form-control" name="foto_perfil" accept="image/jpeg,image/png" />
+        <small class="text-muted">JPG, PNG (máx. 5MB) - Dejar vacío para no cambiar</small>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Archivo de Contrato</label>
+        <input type="file" class="form-control" name="archivo_contrato" accept="application/pdf" />
+        <small class="text-muted">PDF (máx. 10MB) - Dejar vacío para no cambiar</small>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer border-top">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+  <button type="button" class="btn btn-primary" onclick="enviarFormularioEditar('<%= personal.id_personal %>')">
+    <i class="bi bi-check-lg me-1"></i>Guardar Cambios
+  </button>
+</div>

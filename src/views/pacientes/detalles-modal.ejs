@@ -1,0 +1,190 @@
+<div class="row g-0">
+  <!-- Encabezado con info principal -->
+  <div class="col-12 bg-gradient p-4 text-white rounded-top" style="background: linear-gradient(135deg, #1abc9c 0%, #0f9a6f 100%);">
+    <div class="d-flex align-items-center justify-content-between">
+      <div>
+        <h5 class="mb-1"><%= paciente.nombre %> <%= paciente.apellido_paterno %></h5>
+        <p class="mb-0 small">
+          <i class="bi bi-card-text me-1"></i><%= paciente.ci || 'Sin CI' %>
+        </p>
+      </div>
+      <div class="text-end">
+        <span class="badge bg-light text-dark fs-6"><%= paciente.codigo_paciente %></span>
+        <% if (paciente.estado === 0 || paciente.estado === false) { %>
+          <div><span class="badge bg-danger mt-2">Inactivo</span></div>
+        <% } else { %>
+          <div><span class="badge bg-success mt-2">Activo</span></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido del modal -->
+  <div class="col-12 p-4">
+    <!-- Datos personales y contacto en grid -->
+    <div class="row mb-4">
+      <!-- Columna izquierda -->
+      <div class="col-md-6">
+        <h6 class="mb-3 text-uppercase fw-semibold text-muted small">
+          <i class="bi bi-person me-2"></i>Información Personal
+        </h6>
+        <div class="mb-3">
+          <div class="small text-muted">Nombre Completo</div>
+          <div class="fw-semibold">
+            <%= paciente.nombre %> <%= paciente.apellido_paterno %>
+            <% if (paciente.apellido_materno) { %>
+              <%= paciente.apellido_materno %>
+            <% } %>
+          </div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted">Fecha de Nacimiento</div>
+          <div class="fw-semibold">
+            <% if (paciente.fecha_nacimiento) { %>
+              <%= new Date(paciente.fecha_nacimiento).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }) %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted">Nacionalidad</div>
+          <div class="fw-semibold"><%= paciente.nacionalidad || '-' %></div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted">Estado Civil</div>
+          <div class="fw-semibold"><%= paciente.estado_civil || '-' %></div>
+        </div>
+      </div>
+
+      <!-- Columna derecha -->
+      <div class="col-md-6">
+        <h6 class="mb-3 text-uppercase fw-semibold text-muted small">
+          <i class="bi bi-telephone me-2"></i>Contacto
+        </h6>
+        <div class="mb-3">
+          <div class="small text-muted">Teléfono</div>
+          <div class="fw-semibold">
+            <% if (paciente.celular) { %>
+              <i class="bi bi-telephone me-1"></i><%= paciente.celular %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted">Correo Electrónico</div>
+          <div class="fw-semibold text-break">
+            <% if (paciente.correo) { %>
+              <i class="bi bi-envelope me-1"></i><%= paciente.correo %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </div>
+        </div>
+        <div class="mb-3">
+          <div class="small text-muted">Cédula de Identidad</div>
+          <div class="fw-semibold"><%= paciente.ci || '-' %></div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="my-4" />
+
+    <!-- Información médica -->
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <h6 class="mb-3 text-uppercase fw-semibold text-muted small">
+          <i class="bi bi-heart-pulse me-2"></i>Datos Médicos
+        </h6>
+        <div class="mb-3">
+          <div class="small text-muted">Tipo de Sangre</div>
+          <div class="fw-semibold">
+            <% if (paciente.tipo_sangre) { %>
+              <span class="badge bg-danger"><%= paciente.tipo_sangre %></span>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h6 class="mb-3 text-uppercase fw-semibold text-muted small">
+          <i class="bi bi-house me-2"></i>Domicilio
+        </h6>
+        <div class="mb-3">
+          <div class="small text-muted">Dirección</div>
+          <div class="fw-semibold text-break">
+            <% if (paciente.domicilio) { %>
+              <i class="bi bi-geo-alt me-1"></i><%= paciente.domicilio %>
+            <% } else { %>
+              <span class="text-muted">-</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Antecedentes médicos -->
+    <% if (paciente.alergias || paciente.enfermedad_base || paciente.contacto_emerg || paciente.observaciones) { %>
+      <hr class="my-4" />
+      
+      <h6 class="mb-3 text-uppercase fw-semibold text-muted small">
+        <i class="bi bi-file-medical me-2"></i>Antecedentes y Observaciones
+      </h6>
+
+      <% if (paciente.alergias) { %>
+        <div class="mb-3">
+          <div class="alert alert-warning mb-0 py-2">
+            <div class="small text-muted mb-1">
+              <i class="bi bi-exclamation-triangle me-1"></i>Alergias
+            </div>
+            <div class="fw-semibold"><%= paciente.alergias %></div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (paciente.enfermedad_base) { %>
+        <div class="mb-3">
+          <div class="alert alert-danger alert-sm mb-0 py-2">
+            <div class="small text-muted mb-1">
+              <i class="bi bi-capsule me-1"></i>Enfermedad Base
+            </div>
+            <div class="fw-semibold"><%= paciente.enfermedad_base %></div>
+          </div>
+        </div>
+      <% } %>
+
+      <% if (paciente.contacto_emerg) { %>
+        <div class="mb-3">
+          <div class="small text-muted">Contacto de Emergencia</div>
+          <div class="fw-semibold"><%= paciente.contacto_emerg %></div>
+        </div>
+      <% } %>
+
+      <% if (paciente.observaciones) { %>
+        <div class="mb-3">
+          <div class="small text-muted">Observaciones</div>
+          <div class="fw-semibold text-break"><%= paciente.observaciones %></div>
+        </div>
+      <% } %>
+    <% } %>
+
+    <!-- Info de registro -->
+    <hr class="my-4" />
+    <div class="small text-muted">
+      <div>
+        <i class="bi bi-calendar-event me-1"></i>
+        <strong>Registrado:</strong> 
+        <%= new Date(paciente.fecha_creacion).toLocaleDateString('es-ES') %>
+      </div>
+      <% if (paciente.fecha_actualizacion) { %>
+        <div>
+          <i class="bi bi-clock me-1"></i>
+          <strong>Última actualización:</strong> 
+          <%= new Date(paciente.fecha_actualizacion).toLocaleDateString('es-ES') %>
+        </div>
+      <% } %>
+    </div>
+  </div>
+</div>

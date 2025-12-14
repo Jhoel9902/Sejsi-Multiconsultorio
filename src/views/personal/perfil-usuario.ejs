@@ -1,0 +1,119 @@
+<div style="min-width: 300px; max-width: 380px;">
+  <div class="p-3" style="background: white;">
+    <!-- Cabecera con foto -->
+    <div class="text-center mb-3 pb-3 border-bottom">
+      <% if (perfil.foto_perfil) { %>
+        <img 
+          src="<%= perfil.foto_perfil %>" 
+          alt="Foto de perfil"
+          style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; display: block; margin: 0 auto; border: 3px solid var(--primary-color);"
+          onerror="this.style.display='none'; document.querySelector('[data-default-avatar]').style.display='flex';"
+        />
+        <div 
+          data-default-avatar
+          style="
+            width: 100px; 
+            height: 100px; 
+            margin: 0 auto;
+            border-radius: 50%; 
+            background: linear-gradient(135deg, #1abc9c, #0f9a6f);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 2rem;
+            border: 3px solid var(--primary-color);
+          "
+        >
+          <%= (perfil.nombres || 'U')[0] %>
+        </div>
+      <% } else { %>
+        <div 
+          style="
+            width: 100px; 
+            height: 100px; 
+            margin: 0 auto;
+            border-radius: 50%; 
+            background: linear-gradient(135deg, #1abc9c, #0f9a6f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 2rem;
+            border: 3px solid var(--primary-color);
+          "
+        >
+          <%= (perfil.nombres || 'U')[0] %>
+        </div>
+      <% } %>
+      <h6 class="mt-2 mb-1" style="word-break: break-word;">
+        <%= perfil.nombres %> <%= perfil.apellido_paterno %>
+        <% if (perfil.apellido_materno) { %>
+          <%= perfil.apellido_materno %>
+        <% } %>
+      </h6>
+      <small class="text-muted text-capitalize">
+        <span class="badge" style="background: var(--primary-color); color: white;">
+          <%= perfil.nombre_rol %>
+        </span>
+      </small>
+    </div>
+
+    <!-- Información personal -->
+    <div class="mb-2">
+      <small class="text-muted d-block mb-1">
+        <i class="bi bi-briefcase me-1"></i>Cargo
+      </small>
+      <p class="mb-0 small"><%= perfil.cargo || '-' %></p>
+    </div>
+
+    <div class="mb-2">
+      <small class="text-muted d-block mb-1">
+        <i class="bi bi-envelope me-1"></i>Correo
+      </small>
+      <p class="mb-0 small" style="word-break: break-word;">
+        <a href="mailto:<%= perfil.correo %>" class="text-decoration-none">
+          <%= perfil.correo || '-' %>
+        </a>
+      </p>
+    </div>
+
+    <div class="mb-2">
+      <small class="text-muted d-block mb-1">
+        <i class="bi bi-telephone me-1"></i>Teléfono
+      </small>
+      <p class="mb-0 small">
+        <a href="tel:<%= perfil.celular %>" class="text-decoration-none">
+          <%= perfil.celular || '-' %>
+        </a>
+      </p>
+    </div>
+
+    <% if (perfil.especialidades) { %>
+      <div class="mb-2">
+        <small class="text-muted d-block mb-1">
+          <i class="bi bi-stethoscope me-1"></i>Especialidades
+        </small>
+        <p class="mb-0 small">
+          <% perfil.especialidades.split(', ').forEach(esp => { %>
+            <span class="badge bg-info text-dark me-1" style="display: inline-block; margin-bottom: 4px;">
+              <%= esp %>
+            </span>
+          <% }); %>
+        </p>
+      </div>
+    <% } %>
+
+    <!-- Botones -->
+    <div class="d-grid gap-2 mt-3 pt-3 border-top">
+      <a href="/dashboard" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-house me-1"></i>Dashboard
+      </a>
+      <a href="/logout" class="btn btn-sm btn-danger">
+        <i class="bi bi-box-arrow-right me-1"></i>Cerrar Sesión
+      </a>
+    </div>
+  </div>
+</div>

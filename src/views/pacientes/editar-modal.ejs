@@ -1,0 +1,103 @@
+<form method="post" action="/pacientes/editar/<%= paciente.id_paciente %>" class="needs-validation" novalidate>
+  <div class="row g-3">
+    <!-- Datos personales -->
+    <h6 class="col-12 mt-2 text-muted">Datos personales</h6>
+    
+    <div class="col-md-6">
+      <label class="form-label">Nombre <span class="text-danger">*</span></label>
+      <input type="text" class="form-control" name="nombre" value="<%= paciente.nombre %>" required />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Apellido paterno <span class="text-danger">*</span></label>
+      <input type="text" class="form-control" name="apellido_paterno" value="<%= paciente.apellido_paterno %>" required />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Apellido materno</label>
+      <input type="text" class="form-control" name="apellido_materno" value="<%= paciente.apellido_materno || '' %>" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Fecha de nacimiento</label>
+      <input type="date" class="form-control" name="fecha_nacimiento" value="<%= paciente.fecha_nacimiento ? new Date(paciente.fecha_nacimiento).toISOString().split('T')[0] : '' %>" />
+    </div>
+
+    <!-- Documentos y contacto -->
+    <h6 class="col-12 mt-2 text-muted">Documentos</h6>
+
+    <div class="col-md-6">
+      <label class="form-label">Cédula</label>
+      <input type="text" class="form-control" name="ci" value="<%= paciente.ci || '' %>" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Correo</label>
+      <input type="email" class="form-control" name="correo" value="<%= paciente.correo || '' %>" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Teléfono</label>
+      <input type="tel" class="form-control" name="celular" value="<%= paciente.celular || '' %>" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Nacionalidad</label>
+      <input type="text" class="form-control" name="nacionalidad" value="<%= paciente.nacionalidad || '' %>" />
+    </div>
+
+    <!-- Datos médicos -->
+    <h6 class="col-12 mt-2 text-muted">Datos médicos</h6>
+
+    <div class="col-md-4">
+      <label class="form-label">Tipo de sangre</label>
+      <select class="form-select" name="tipo_sangre">
+        <option value="">-- Seleccionar --</option>
+        <option value="O+" <%= paciente.tipo_sangre === 'O+' ? 'selected' : '' %>>O+</option>
+        <option value="O-" <%= paciente.tipo_sangre === 'O-' ? 'selected' : '' %>>O-</option>
+        <option value="A+" <%= paciente.tipo_sangre === 'A+' ? 'selected' : '' %>>A+</option>
+        <option value="A-" <%= paciente.tipo_sangre === 'A-' ? 'selected' : '' %>>A-</option>
+        <option value="B+" <%= paciente.tipo_sangre === 'B+' ? 'selected' : '' %>>B+</option>
+        <option value="B-" <%= paciente.tipo_sangre === 'B-' ? 'selected' : '' %>>B-</option>
+        <option value="AB+" <%= paciente.tipo_sangre === 'AB+' ? 'selected' : '' %>>AB+</option>
+        <option value="AB-" <%= paciente.tipo_sangre === 'AB-' ? 'selected' : '' %>>AB-</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Estado civil</label>
+      <select class="form-select" name="estado_civil">
+        <option value="">-- Seleccionar --</option>
+        <option value="Soltero/a" <%= paciente.estado_civil === 'Soltero/a' ? 'selected' : '' %>>Soltero/a</option>
+        <option value="Casado/a" <%= paciente.estado_civil === 'Casado/a' ? 'selected' : '' %>>Casado/a</option>
+        <option value="Divorciado/a" <%= paciente.estado_civil === 'Divorciado/a' ? 'selected' : '' %>>Divorciado/a</option>
+        <option value="Viudo/a" <%= paciente.estado_civil === 'Viudo/a' ? 'selected' : '' %>>Viudo/a</option>
+        <option value="Unión libre" <%= paciente.estado_civil === 'Unión libre' ? 'selected' : '' %>>Unión libre</option>
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Contacto emergencia</label>
+      <input type="text" class="form-control" name="contacto_emerg" value="<%= paciente.contacto_emerg || '' %>" />
+    </div>
+
+    <!-- Domicilio -->
+    <h6 class="col-12 mt-2 text-muted">Domicilio</h6>
+    <div class="col-12">
+      <input type="text" class="form-control" name="domicilio" value="<%= paciente.domicilio || '' %>" />
+    </div>
+
+    <!-- Antecedentes -->
+    <h6 class="col-12 mt-2 text-muted">Antecedentes</h6>
+    <div class="col-12">
+      <label class="form-label">Alergias</label>
+      <textarea class="form-control" name="alergias" rows="2"><%= paciente.alergias || '' %></textarea>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Enfermedades base</label>
+      <textarea class="form-control" name="enfermedad_base" rows="2"><%= paciente.enfermedad_base || '' %></textarea>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Observaciones</label>
+      <textarea class="form-control" name="observaciones" rows="2"><%= paciente.observaciones || '' %></textarea>
+    </div>
+
+    <!-- Botones -->
+    <div class="col-12 mt-3">
+      <button type="submit" class="btn btn-primary btn-sm me-2"><i class="bi bi-check-lg me-1"></i>Actualizar</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal"><i class="bi bi-x-lg me-1"></i>Cancelar</button>
+    </div>
+  </div>
+</form>

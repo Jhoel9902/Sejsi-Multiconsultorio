@@ -1,0 +1,123 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header border-bottom bg-light">
+        <h5 class="mb-0"><i class="bi bi-stethoscope me-2"></i>Médicos Disponibles</h5>
+      </div>
+
+      <div class="card-body p-0">
+        <% if (medicos && medicos.length > 0) { %>
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Nombre</th>
+                  <th>Especialidad</th>
+                  <th>Cargo</th>
+                  <th>Correo</th>
+                  <th>Teléfono</th>
+                  <th class="text-center" style="width: 100px;">Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% medicos.forEach(m => { %>
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <% if (m.foto_perfil) { %>
+                          <img 
+                            src="<%= m.foto_perfil %>" 
+                            alt="Foto"
+                            style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;"
+                            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                          />
+                          <div 
+                            style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #1abc9c, #0f9a6f); display: none; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.75rem;"
+                          >
+                            <%= (m.nombres || 'M')[0] %>
+                          </div>
+                        <% } else { %>
+                          <div 
+                            style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #1abc9c, #0f9a6f); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.75rem;"
+                          >
+                            <%= (m.nombres || 'M')[0] %>
+                          </div>
+                        <% } %>
+                        <span class="fw-semibold">
+                          <%= m.nombres %> <%= m.apellido_paterno %>
+                          <% if (m.apellido_materno) { %>
+                            <%= m.apellido_materno %>
+                          <% } %>
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <% if (m.especialidades) { %>
+                        <% m.especialidades.split(', ').forEach(esp => { %>
+                          <span class="badge bg-info text-dark me-1" style="display: inline-block; margin-bottom: 4px;">
+                            <%= esp %>
+                          </span>
+                        <% }); %>
+                      <% } else { %>
+                        <span class="badge bg-info text-dark">General</span>
+                      <% } %>
+                    </td>
+                    <td><small><%= m.cargo || '-' %></small></td>
+                    <td><small class="text-muted"><%= m.correo || '-' %></small></td>
+                    <td><small><%= m.celular || '-' %></small></td>
+                    <td class="text-center">
+                      <button 
+                        type="button" 
+                        class="btn btn-sm btn-outline-primary"
+                        onclick="abrirDetallesMedico('<%= m.id_personal %>')"
+                        title="Ver detalles"
+                      >
+                        <i class="bi bi-eye"></i>
+                      </button>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="p-4 text-center text-muted">
+            <i class="bi bi-inbox" style="font-size: 2rem; opacity: 0.5;"></i>
+            <p class="mt-2">No hay médicos disponibles</p>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para detalles de médico -->
+<div class="modal fade" id="modalDetallesMedico" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title">Detalles del Médico</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="contenidoModalMedico">
+        <div class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function abrirDetallesMedico(id) {
+    fetch(`/personal/medico/${id}`)
+      .then(r => r.text())
+      .then(html => {
+        document.getElementById('contenidoModalMedico').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('modalDetallesMedico')).show();
+      })
+      .catch(err => alert('Error al cargar los detalles del médico'));
+  }
+</script>

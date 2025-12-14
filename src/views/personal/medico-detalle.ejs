@@ -1,0 +1,103 @@
+<div class="modal-body p-4">
+  <div class="row">
+    <div class="col-md-4 text-center mb-4">
+      <% if (medico.foto_perfil) { %>
+        <img 
+          src="<%= medico.foto_perfil %>" 
+          alt="Foto del médico"
+          style="width: 100%; aspect-ratio: 1; border-radius: 12px; object-fit: cover; display: block;"
+          onerror="this.style.display='none'; document.querySelector('[data-default-medico]').style.display='flex';"
+        />
+        <div 
+          data-default-medico
+          style="
+            width: 100%; 
+            aspect-ratio: 1; 
+            border-radius: 12px; 
+            background: linear-gradient(135deg, #1abc9c, #0f9a6f);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+            font-weight: bold;
+          "
+        >
+          <%= (medico.nombres || 'M')[0] %>
+        </div>
+      <% } else { %>
+        <div 
+          style="
+            width: 100%; 
+            aspect-ratio: 1; 
+            border-radius: 12px; 
+            background: linear-gradient(135deg, #1abc9c, #0f9a6f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 3rem;
+            font-weight: bold;
+          "
+        >
+          <%= (medico.nombres || 'M')[0] %>
+        </div>
+      <% } %>
+      <h6 class="mt-3">
+        <%= medico.nombres %> <%= medico.apellido_paterno %>
+        <% if (medico.apellido_materno) { %>
+          <%= medico.apellido_materno %>
+        <% } %>
+      </h6>
+      <span class="badge bg-info text-dark">
+        <%= medico.especialidad || 'General' %>
+      </span>
+    </div>
+
+    <div class="col-md-8">
+      <h6 class="text-uppercase text-muted fw-semibold mb-3">
+        <i class="bi bi-information-circle me-2"></i>Información
+      </h6>
+      
+      <div class="mb-3">
+        <label class="form-label text-muted small">Cargo</label>
+        <p class="mb-0"><%= medico.cargo || '-' %></p>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label text-muted small">Correo</label>
+        <p class="mb-0">
+          <a href="mailto:<%= medico.correo %>"><%= medico.correo || '-' %></a>
+        </p>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label text-muted small">Teléfono</label>
+        <p class="mb-0">
+          <a href="tel:<%= medico.celular %>"><%= medico.celular || '-' %></a>
+        </p>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label text-muted small">Domicilio</label>
+        <p class="mb-0"><%= medico.domicilio || 'No especificado' %></p>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label text-muted small">Rol</label>
+        <p class="mb-0">
+          <span class="badge" style="background: var(--primary-color); color: white;">
+            <%= medico.nombre_rol %>
+          </span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-footer border-top">
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+  <button type="button" class="btn btn-primary">
+    <i class="bi bi-calendar-plus me-1"></i>Agendar Cita
+  </button>
+</div>

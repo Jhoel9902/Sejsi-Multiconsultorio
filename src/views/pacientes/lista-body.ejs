@@ -1,0 +1,250 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <!-- Header con filtros y botón nuevo -->
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <h5 class="card-title mb-0"><i class="bi bi-people me-2"></i>Pacientes</h5>
+          <div class="d-flex gap-2 flex-wrap">
+            <% if (user.nombre_rol === 'admin') { %>
+              <div class="btn-group btn-group-sm" role="group">
+                <a href="/pacientes?filtro=todos" class="btn <%= filtroActual === 'todos' ? 'btn-primary' : 'btn-outline-primary' %>">Todos</a>
+                <a href="/pacientes?filtro=activos" class="btn <%= filtroActual === 'activos' ? 'btn-success' : 'btn-outline-success' %>">Activos</a>
+                <a href="/pacientes?filtro=inactivos" class="btn <%= filtroActual === 'inactivos' ? 'btn-danger' : 'btn-outline-danger' %>">Inactivos</a>
+              </div>
+            <% } %>
+            <% if (user.nombre_rol !== 'medico') { %>
+              <a href="/pacientes/crear" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Nuevo</a>
+            <% } %>
+          </div>
+        </div>
+
+        <!-- Tabla de pacientes -->
+        <% if (pacientes && pacientes.length > 0) { %>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="fw-semibold">Código</th>
+                  <th class="fw-semibold">Nombres</th>
+                  <th class="fw-semibold d-none d-md-table-cell">Cédula</th>
+                  <th class="fw-semibold d-none d-lg-table-cell">Teléfono</th>
+                  <th class="fw-semibold d-none d-xl-table-cell">Correo</th>
+                  <% if (user.nombre_rol === 'admin') { %>
+                    <th class="fw-semibold">Estado</th>
+                  <% } %>
+                  <th class="fw-semibold text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% pacientes.forEach(p => { %>
+                  <tr>
+                    <td>
+                      <span class="badge bg-light text-dark"><%= p.codigo_paciente %></span>
+                    </td>
+                    <td>
+                      <strong><%= p.nombre %> <%= p.apellido_paterno %></strong>
+                      <% if (p.apellido_materno) { %>
+                        <br><small class="text-muted"><%= p.apellido_materno %></small>
+                      <% } %>
+                    </td>
+                    <td class="d-none d-md-table-cell"><small><%= p.ci || '-' %></small></td>
+                    <td class="d-none d-lg-table-cell"><small><%= p.celular || '-' %></small></td>
+                    <td class="d-none d-xl-table-cell"><small><%= p.correo || '-' %></small></td>
+                    <% if (user.nombre_rol === 'admin') { %>
+                      <td>
+                        <form method="post" action="/pacientes/toggle-estado/<%= p.id_paciente %>" class="d-inline">
+                          <% if (p.estado) { %>
+                            <button type="submit" class="btn btn-sm btn-success" title="Activo - Click para desactivar">
+                              <i class="bi bi-toggle-on"></i>
+                            </button>
+                          <% } else { %>
+                            <button type="submit" class="btn btn-sm btn-danger" title="Inactivo - Click para activar">
+                              <i class="bi bi-toggle-off"></i>
+                            </button>
+                          <% } %>
+                        </form>
+                      </td>
+                    <% } %>
+                    <td class="text-center">
+                      <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-info" onclick="abrirModalDetalles('<%= p.id_paciente %>')" title="Ver detalles del paciente">
+                          <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="abrirModalEditar('<%= p.id_paciente %>')" title="Editar paciente">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="alert alert-info text-center my-4">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>No hay pacientes registrados</strong>
+            <% if (user.nombre_rol !== 'medico') { %>
+              <br>
+              <a href="/pacientes/crear" class="alert-link">Registrar el primer paciente</a>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalles del Paciente -->
+<div class="modal fade" id="modalDetalles" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <button type="button" class="btn-close position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 1050;"></button>
+      <div id="modalDetallesBody">
+        <div class="text-center py-5">
+          <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Cargando detalles...</span>
+          </div>
+          <p class="text-muted mt-3">Cargando información del paciente...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Editar Paciente -->
+<div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>Editar paciente</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div id="modalBody" class="modal-body">
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando formulario...</span>
+          </div>
+          <p class="text-muted mt-3">Cargando formulario...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function abrirModalEditar(idPaciente) {
+  const modal = new bootstrap.Modal(document.getElementById('modalEditar'));
+  const modalBody = document.getElementById('modalBody');
+  
+  try {
+    const response = await fetch(`/pacientes/obtener-form/${idPaciente}`);
+    if (!response.ok) throw new Error('Error al cargar');
+    const html = await response.text();
+    modalBody.innerHTML = html;
+    modal.show();
+    
+    // Asignar evento al formulario después de cargar
+    setTimeout(() => {
+      const form = modalBody.querySelector('form');
+      if (form) {
+        form.addEventListener('submit', manejarSubmitModal);
+      }
+    }, 100);
+  } catch (err) {
+    modalBody.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar el formulario.</div>';
+  }
+}
+
+async function manejarSubmitModal(e) {
+  e.preventDefault();
+  const form = e.target;
+  const url = form.getAttribute('action');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  
+  // Deshabilitar botón y mostrar spinner
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...';
+  
+  try {
+    const formData = new FormData(form);
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      bootstrap.Modal.getInstance(document.getElementById('modalEditar')).hide();
+      
+      // Mostrar notificación de éxito
+      showToast('Éxito', data.mensaje || 'Paciente actualizado exitosamente.', 'success');
+      
+      // Recargar tabla después de 1 segundo
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      const data = await response.json();
+      showToast('Error', data.mensaje || 'No se pudo actualizar el paciente.', 'danger');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }
+  } catch (err) {
+    showToast('Error', 'Error al enviar el formulario: ' + err.message, 'danger');
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  }
+}
+
+function showToast(title, message, type = 'success') {
+  const toastContainer = document.querySelector('body');
+  const toastHtml = `
+    <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          <strong>${title}:</strong> ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  `;
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = toastHtml;
+  const toastEl = tempDiv.firstElementChild;
+  
+  // Agregar estilos para el contenedor
+  toastEl.style.position = 'fixed';
+  toastEl.style.top = '20px';
+  toastEl.style.right = '20px';
+  toastEl.style.minWidth = '300px';
+  toastEl.style.zIndex = '9999';
+  
+  document.body.appendChild(toastEl);
+  const toast = new bootstrap.Toast(toastEl);
+  toast.show();
+  
+  // Eliminar elemento después de que se oculte
+  toastEl.addEventListener('hidden.bs.toast', () => {
+    toastEl.remove();
+  });
+}
+
+async function abrirModalDetalles(idPaciente) {
+  const modal = new bootstrap.Modal(document.getElementById('modalDetalles'));
+  const modalBody = document.getElementById('modalDetallesBody');
+  
+  try {
+    const response = await fetch(`/pacientes/obtener-detalles/${idPaciente}`);
+    if (!response.ok) throw new Error('Error al cargar');
+    const html = await response.text();
+    modalBody.innerHTML = html;
+    modal.show();
+  } catch (err) {
+    modalBody.innerHTML = '<div class="alert alert-danger m-4"><i class="bi bi-exclamation-triangle me-2"></i>Error al cargar los detalles.</div>';
+  }
+}
+</script>

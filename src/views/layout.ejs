@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= title || 'Sejsi Multiconsultorio' %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      :root {
+        --primary-color: #1abc9c;
+        --primary-dark: #0f9a6f;
+        --text-light: #e8efff;
+        --bg-light: #f5f7fb;
+      }
+      
+      * { box-sizing: border-box; }
+      
+      html, body { height: 100%; }
+      body { background: var(--bg-light); margin: 0; }
+      
+      .app-shell { 
+        min-height: 100vh; 
+        display: flex; 
+      }
+      
+      .sidebar { 
+        width: 260px; 
+        background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-dark) 100%); 
+        color: #fff; 
+        overflow-y: auto;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+      }
+      
+      .sidebar .brand { 
+        font-weight: 700; 
+        letter-spacing: 0.5px; 
+        color: #fff;
+      }
+      
+      .sidebar a { 
+        color: var(--text-light); 
+        text-decoration: none; 
+      }
+      
+      .sidebar .nav-link { 
+        color: var(--text-light); 
+        border-radius: 8px; 
+        padding: 12px 14px; 
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+      }
+      
+      .sidebar .nav-link.active, 
+      .sidebar .nav-link:hover { 
+        background: rgba(255,255,255,0.15); 
+        color: #fff; 
+        padding-left: 16px;
+      }
+      
+      .topbar { 
+        height: 64px; 
+        border-bottom: 1px solid #e6e9f1; 
+        display:flex; 
+        align-items:center; 
+        justify-content:space-between; 
+        padding: 0 1.5rem; 
+        background:#fff; 
+        position: relative; 
+        z-index: 1020;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      }
+      
+      .content { 
+        flex: 1; 
+        display:flex; 
+        flex-direction:column; 
+        overflow: hidden; 
+      }
+      
+      .page { 
+        padding: 1.5rem; 
+        overflow-y: auto; 
+        flex: 1;
+      }
+      
+      .card { 
+        border: none; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05); 
+        border-radius: 12px;
+      }
+      
+      .badge-role { 
+        text-transform: capitalize; 
+      }
+      
+      .btn-primary { 
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark)); 
+        border: none; 
+      }
+      
+      .btn-primary:hover { 
+        background: linear-gradient(135deg, #18a888, #0d845f); 
+      }
+      
+      .btn-outline-primary { 
+        color: var(--primary-dark); 
+        border-color: var(--primary-color); 
+      }
+      
+      .btn-outline-primary:hover { 
+        background: var(--primary-color); 
+        color: #fff; 
+      }
+      
+      /* Estilos para submenú */
+      .collapse {
+        overflow: hidden;
+        transition: max-height 0.3s ease;
+      }
+      
+      .collapse.show {
+        display: block;
+      }
+      
+      .nav-link[data-bs-toggle="collapse"] {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .nav-link[data-bs-toggle="collapse"] .bi-chevron-down {
+        transition: transform 0.3s ease;
+        transform: rotate(-90deg);
+      }
+      
+      .nav-link[data-bs-toggle="collapse"][aria-expanded="true"] .bi-chevron-down {
+        transform: rotate(0deg);
+      }
+      
+      .nav .nav-link.small {
+        padding: 8px 10px;
+        font-size: 0.9rem;
+      }
+      
+      .table-responsive { 
+        overflow-x: auto; 
+        border-radius: 8px;
+      }
+      
+      .modal-dialog-scrollable .modal-body { 
+        max-height: calc(100vh - 200px); 
+        overflow-y: auto; 
+      }
+      
+      /* Estilos para Popover */
+      .popover {
+        max-width: 400px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        border-radius: 12px;
+      }
+      
+      .popover-body {
+        padding: 0;
+        border: none;
+      }
+      
+      .popover .popover-body > div {
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: calc(100vh - 200px);
+      }
+      
+      /* Responsive Design */
+      @media (max-width: 992px) {
+        .sidebar { 
+          position: fixed; 
+          left: -260px; 
+          top: 0; 
+          bottom: 0; 
+          z-index: 1050; 
+          transition: left 0.3s ease; 
+          width: 280px; 
+          height: 100vh;
+          overflow-y: auto;
+        }
+        
+        .sidebar.open { 
+          left: 0; 
+        }
+        
+        .sidebar-backdrop { 
+          display: none; 
+          position: fixed; 
+          inset: 0; 
+          background: rgba(0,0,0,0.45); 
+          z-index: 1040; 
+          transition: opacity 0.3s ease;
+        }
+        
+        .sidebar-backdrop.show { 
+          display: block; 
+        }
+        
+        .page { 
+          padding: 1rem; 
+        }
+        
+        .topbar {
+          padding: 0 1rem;
+        }
+      }
+      
+      @media (max-width: 768px) {
+        .page {
+          padding: 0.75rem;
+        }
+        
+        .topbar {
+          padding: 0 0.75rem;
+        }
+        
+        .card {
+          border-radius: 8px;
+        }
+        
+        .table-responsive {
+          font-size: 0.85rem;
+        }
+        
+        .btn-sm {
+          padding: 0.35rem 0.5rem;
+          font-size: 0.75rem;
+        }
+      }
+      
+      @media (max-width: 576px) {
+        .sidebar { 
+          width: 100%; 
+        }
+        
+        .page {
+          padding: 0.5rem;
+        }
+        
+        .topbar {
+          padding: 0 0.5rem;
+          height: 56px;
+        }
+        
+        h5 {
+          font-size: 1rem;
+        }
+        
+        .card-body {
+          padding: 1rem;
+        }
+        
+        .d-flex {
+          flex-wrap: wrap;
+        }
+      }
+      
+      /* Scrollbar styling */
+      .sidebar::-webkit-scrollbar {
+        width: 6px;
+      }
+      
+      .sidebar::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.1);
+      }
+      
+      .sidebar::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.3);
+        border-radius: 3px;
+      }
+      
+      .sidebar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <% if (user) { %>
+      <aside id="sidebar" class="sidebar">
+        <div class="d-flex align-items-center justify-content-between px-3 py-3">
+          <div class="brand d-flex align-items-center gap-2">
+            <i class="bi bi-hospital fs-4"></i>
+            <span>Sejsi</span>
+          </div>
+          <button class="btn btn-sm btn-light d-lg-none" type="button" onclick="toggleSidebar()"><i class="bi bi-x"></i></button>
+        </div>
+        <div class="px-3 pb-3">
+          <div class="small text-white-50 mb-2">Menú</div>
+          <nav class="nav flex-column gap-1">
+            <a class="nav-link active" href="/dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+            <a class="nav-link" href="/pacientes"><i class="bi bi-people me-2"></i>Pacientes</a>
+            
+            <!-- Menú Mi Perfil (todos los usuarios) -->
+            <a class="nav-link" href="#" onclick="abrirPerfilUsuario(); return false;">
+              <i class="bi bi-person-circle me-2"></i>Mi Perfil
+            </a>
+
+            <!-- Menú Médicos (admin, ventanilla) -->
+            <% if (user && (user.nombre_rol === 'admin' || user.nombre_rol === 'ventanilla')) { %>
+              <a class="nav-link" href="/personal/medicos">
+                <i class="bi bi-stethoscope me-2"></i>Médicos
+              </a>
+            <% } %>
+            
+            <!-- Menú Personal (solo admin) -->
+            <% if (user && user.nombre_rol === 'admin') { %>
+              <a class="nav-link" href="#personalMenu" data-bs-toggle="collapse" role="button" aria-expanded="false">
+                <i class="bi bi-person-badge me-2"></i>Personal
+                <i class="bi bi-chevron-down ms-auto"></i>
+              </a>
+              <div class="collapse ms-3" id="personalMenu">
+                <nav class="nav flex-column gap-1">
+                  <a class="nav-link small" href="/personal/registrar"><i class="bi bi-person-plus me-2"></i>Registrar</a>
+                  <a class="nav-link small" href="/personal/gestionar"><i class="bi bi-person-gear me-2"></i>Gestionar</a>
+                  <a class="nav-link small" href="#"><i class="bi bi-clock-history me-2"></i>Horarios</a>
+                  <a class="nav-link small" href="#"><i class="bi bi-file-text me-2"></i>Contratos</a>
+                </nav>
+              </div>
+            <% } %>
+            
+            <a class="nav-link" href="#"><i class="bi bi-calendar-event me-2"></i>Citas</a>
+            <a class="nav-link" href="#"><i class="bi bi-file-medical me-2"></i>Historias</a>
+            <a class="nav-link" href="#"><i class="bi bi-receipt me-2"></i>Facturación</a>
+          </nav>
+          <div class="small text-white-50 mt-4 mb-2">Accesos rápidos</div>
+          <div class="d-grid gap-2">
+            <a href="/pacientes/buscar" class="btn btn-outline-light btn-sm text-start"><i class="bi bi-search me-2"></i>Buscar paciente</a>
+            <button class="btn btn-outline-light btn-sm text-start"><i class="bi bi-plus-circle me-2"></i>Nueva cita</button>
+            <button class="btn btn-outline-light btn-sm text-start"><i class="bi bi-person-plus me-2"></i>Registrar paciente</button>
+          </div>
+        </div>
+      </aside>
+      <div id="sidebar-backdrop" class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+      
+      <!-- Contenedor oculto para popover del perfil -->
+      <div id="perfilUserContent" style="display: none;"></div>
+      
+      <% } %>
+
+      <div class="content">
+        <header class="topbar">
+          <div class="d-flex align-items-center gap-2">
+            <% if (user) { %>
+              <button class="btn btn-outline-secondary d-lg-none" type="button" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+            <% } %>
+            <h6 class="mb-0 text-secondary"><%= title || 'Sejsi Multiconsultorio' %></h6>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <% if (user) { %>
+              <div 
+                id="avatarUsuario"
+                class="d-flex align-items-center gap-2 cursor-pointer" 
+                onclick="abrirPerfilUsuario()"
+                style="cursor: pointer;"
+              >
+                <div style="position: relative; width: 36px; height: 36px;">
+                  <% if (user.foto_perfil) { %>
+                    <img src="<%= user.foto_perfil %>" alt="Foto" 
+                      style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover;" 
+                      onerror="this.style.display='none'; document.querySelector('[data-avatar-fallback]').style.display='flex';" />
+                    <div data-avatar-fallback style="width: 36px; height: 36px; border-radius: 50%; display: none; align-items: center; justify-content: center; background: linear-gradient(135deg, #1abc9c, #0f9a6f); color: white; font-weight: bold; font-size: 14px;">
+                      <%= (user.nombres || 'U')[0] %>
+                    </div>
+                  <% } else { %>
+                    <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1abc9c, #0f9a6f); color: white; font-weight: bold; font-size: 14px;">
+                      <%= (user.nombres || 'U')[0] %>
+                    </div>
+                  <% } %>
+                </div>
+                <div class="text-end">
+                  <div class="fw-semibold"><%= user.nombres %></div>
+                  <div class="small text-muted text-capitalize"><%= user.nombre_rol %></div>
+                </div>
+              </div>
+              <form action="/logout" method="post" class="mb-0">
+                <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-box-arrow-right me-1"></i>Salir</button>
+              </form>
+            <% } %>
+          </div>
+        </header>
+        <main class="page">
+          <% if (typeof bodyView !== 'undefined' && bodyView) { %>
+            <%- include(bodyView) %>
+          <% } else { %>
+            <%- body || '' %>
+          <% } %>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        if (!sidebar) return;
+        sidebar.classList.toggle('open');
+        if (backdrop) backdrop.classList.toggle('show');
+      }
+
+      function abrirPerfilUsuario() {
+        const userId = '<%= user?.id_personal || "" %>';
+        if (!userId) {
+          alert('No se pudo cargar el perfil');
+          return;
+        }
+        
+        fetch(`/personal/mi-perfil`)
+          .then(r => r.text())
+          .then(html => {
+            const avatarBtn = document.getElementById('avatarUsuario');
+            
+            // Destroy popover anterior si existe
+            const existingPopover = bootstrap.Popover.getInstance(avatarBtn);
+            if (existingPopover) {
+              existingPopover.dispose();
+            }
+            
+            // Crear contenedor con el HTML
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            wrapper.style.maxWidth = '400px';
+            wrapper.style.overflow = 'hidden';
+            
+            // Crear nuevo popover
+            const popover = new bootstrap.Popover(avatarBtn, {
+              html: true,
+              content: wrapper.innerHTML,
+              placement: 'bottom',
+              trigger: 'manual',
+              sanitize: false,
+              boundary: 'window',
+              popperConfig: {
+                modifiers: [
+                  {
+                    name: 'flip',
+                    options: {
+                      padding: 8,
+                    },
+                  },
+                  {
+                    name: 'preventOverflow',
+                    options: {
+                      padding: 8,
+                    },
+                  }
+                ],
+              }
+            });
+            
+            popover.show();
+            
+            // Cerrar popover si hace click fuera
+            document.addEventListener('click', function closePopover(e) {
+              if (!avatarBtn.contains(e.target) && !document.querySelector('.popover')?.contains(e.target)) {
+                popover.hide();
+                document.removeEventListener('click', closePopover);
+              }
+            });
+          })
+          .catch(err => console.error('Error al cargar perfil:', err));
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
