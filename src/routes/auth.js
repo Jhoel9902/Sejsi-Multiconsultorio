@@ -34,7 +34,7 @@ router.post('/login', async (req, res) => {
     }
     const user = resultSet[0];
 
-    // Nota: La BD puede almacenar contraseñas en texto o hash bcrypt.
+    // Nota: La BD puede almacenar contraseñas en hash o bcrypt.
     const stored = user.contrasena || '';
     const okPlain = stored === password;
     let okHash = false;

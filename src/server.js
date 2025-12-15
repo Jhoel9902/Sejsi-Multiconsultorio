@@ -40,6 +40,53 @@ app.use(dashboardRouter);
 app.use(pacientesRouter);
 app.use(personalRouter);
 
+// 404 - Página no encontrada
+app.use((req, res) => {
+  res.status(404).render('404', { user: req.user || null });
+});
+
+// Middleware de error global
+app.use((err, req, res, next) => {
+  console.error('❌ Error no manejado:', {
+    message: err.message,
+    status: err.status || 500,
+    path: req.path,
+    method: req.method,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+
+  const status = err.status || 500;
+  const message = err.message || 'Error interno del servidor';
+
+  // Si es solicitud AJAX, devolver JSON
+  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+    return res.status(status).json({
+      error: message,
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    });
+  }
+
+  // Si no, mostrar página de error
+  res.status(status).render('error', {
+    user: req.user || null,
+    statusCode: status,
+    message,
+    details: process.env.NODE_ENV === 'development' ? err.stack : null
+  });
+});
+
+// Manejo de promesas rechazadas no capturadas
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Promesa rechazada no manejada:', reason);
+  // No termina el proceso, solo registra el error
+});
+
+// Manejo de excepciones no capturadas
+process.on('uncaughtException', (error) => {
+  console.error('❌ Excepción no capturada:', error);
+  // En producción, aquí podrías reiniciar el proceso o alertar
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);

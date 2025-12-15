@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>404 - Página no encontrada</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      :root {
+        --primary-color: #1abc9c;
+        --primary-dark: #0f9a6f;
+      }
+      
+      body {
+        background: linear-gradient(135deg, #f5f7fb 0%, #e8f4f8 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .error-container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        padding: 3rem;
+        max-width: 600px;
+        text-align: center;
+      }
+      
+      .error-code {
+        font-size: 5rem;
+        font-weight: bold;
+        color: var(--primary-color);
+        margin-bottom: 1rem;
+      }
+      
+      .error-message {
+        font-size: 1.5rem;
+        color: #333;
+        margin-bottom: 1rem;
+      }
+      
+      .error-description {
+        color: #666;
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+      }
+      
+      .error-icon {
+        font-size: 4rem;
+        color: var(--primary-dark);
+        margin-bottom: 1rem;
+      }
+      
+      .action-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      
+      .btn-primary {
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        border: none;
+      }
+      
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #18a888, #0d845f);
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="error-container">
+      <div class="error-icon">
+        <i class="bi bi-question-circle"></i>
+      </div>
+      
+      <div class="error-code">404</div>
+      <div class="error-message">Página no encontrada</div>
+      <div class="error-description">La página que estás buscando no existe o ha sido movida.</div>
+      
+      <div class="action-buttons">
+        <% if (user) { %>
+          <a href="/dashboard" class="btn btn-primary btn-lg">
+            <i class="bi bi-house me-2"></i>Ir al Dashboard
+          </a>
+          <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg">
+            <i class="bi bi-arrow-left me-2"></i>Volver Atrás
+          </a>
+        <% } else { %>
+          <a href="/login" class="btn btn-primary btn-lg">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Ir al Login
+          </a>
+        <% } %>
+      </div>
+      
+      <hr class="my-3">
+      <small class="text-muted">
+        Sejsi Multiconsultorio v1.0.0
+      </small>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
