@@ -10,7 +10,7 @@ router.get('/especialidades', requireAuth, requireRole(['admin']), async (req, r
     const [especialidades] = await pool.query('CALL sp_esp_listar()');
     const lista = Array.isArray(especialidades) ? especialidades[0] : especialidades;
     
-    res.render('especialidades/listar', { user: req.user, especialidades: lista });
+    res.render('especialidades/listar', { user: req.user, especialidades: lista, error: null });
   } catch (err) {
     console.error('Error fetching especialidades', err);
     res.status(500).render('especialidades/listar', { 
@@ -30,8 +30,8 @@ router.get('/especialidades/registrar', requireAuth, requireRole(['admin']), (re
 router.post('/especialidades', requireAuth, requireRole(['admin']), async (req, res) => {
   const { nombre, descripcion } = req.body;
 
-  // Validación: nombre solo letras y espacios
-  if (!/^[a-záéíóúñ\s]+$/i.test(nombre)) {
+  // Validación: nombre solo letras y espacios (incluyendo mayúsculas y caracteres españoles)
+  if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombre)) {
     return res.status(400).render('especialidades/registrar', {
       user: req.user,
       error: 'El nombre debe contener solo letras y espacios.',
@@ -95,8 +95,8 @@ router.post('/especialidades/editar/:id', requireAuth, requireRole(['admin']), a
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
 
-  // Validación: nombre solo letras y espacios
-  if (!/^[a-záéíóúñ\s]+$/i.test(nombre)) {
+  // Validación: nombre solo letras y espacios (incluyendo mayúsculas y caracteres españoles)
+  if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombre)) {
     return res.status(400).json({ error: 'El nombre debe contener solo letras y espacios.' });
   }
 
@@ -122,28 +122,37 @@ router.post('/especialidades/editar/:id', requireAuth, requireRole(['admin']), a
 // GET /especialidades/asignar - Página para asignar especialidades a médicos (solo admin)
 router.get('/especialidades/asignar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    // Obtener médicos (personal con rol_id = medico)
+    // Obtener médicos con sus especialidades (como objetos, no concatenados)
     const [medicos] = await pool.query(`
-      SELECT p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.foto_perfil,
-             GROUP_CONCAT(e.nombre SEPARATOR ', ') AS especialidades
+      SELECT p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.foto_perfil
       FROM tpersonal p
-      LEFT JOIN tpersonal_especialidad pe ON p.id_personal = pe.id_personal AND pe.estado = TRUE
-      LEFT JOIN tespecialidad e ON pe.id_especialidad = e.id_especialidad
       WHERE p.id_rol = (SELECT id_rol FROM trol WHERE nombre_rol = 'medico') AND p.estado = TRUE
-      GROUP BY p.id_personal
       ORDER BY p.nombres ASC
     `);
 
-    // Obtener especialidades
+    // Obtener especialidades de cada médico con IDs
+    const medicosConEspecialidades = [];
+    for (const medico of medicos) {
+      const [especialidades] = await pool.query(`
+        SELECT pe.id_especialidad, e.nombre
+        FROM tpersonal_especialidad pe
+        JOIN tespecialidad e ON pe.id_especialidad = e.id_especialidad
+        WHERE pe.id_personal = ? AND pe.estado = TRUE
+      `, [medico.id_personal]);
+      
+      medico.especialidades_array = especialidades || [];
+      medicosConEspecialidades.push(medico);
+    }
+
+    // Obtener especialidades disponibles
     const [especialidades] = await pool.query('CALL sp_esp_listar()');
     const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
 
-    const medsList = Array.isArray(medicos) ? medicos : [medicos];
-
     res.render('especialidades/asignar', { 
       user: req.user, 
-      medicos: medsList, 
-      especialidades: esps 
+      medicos: medicosConEspecialidades, 
+      especialidades: esps,
+      error: null
     });
   } catch (err) {
     console.error('Error loading asignar especialidades', err);

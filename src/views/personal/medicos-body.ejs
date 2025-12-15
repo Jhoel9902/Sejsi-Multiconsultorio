@@ -1,8 +1,22 @@
 <div class="row">
   <div class="col-12">
     <div class="card">
-      <div class="card-header border-bottom bg-light">
+      <div class="card-header border-bottom bg-light d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="bi bi-stethoscope me-2"></i>Médicos Disponibles</h5>
+        <button class="btn btn-sm btn-outline-secondary" id="btnFiltro" data-bs-toggle="collapse" data-bs-target="#filtroEspecialidad">
+          <i class="bi bi-funnel me-1"></i>Filtrar por Especialidad
+        </button>
+      </div>
+
+      <div class="collapse" id="filtroEspecialidad">
+        <div class="card-body border-bottom bg-light">
+          <select id="selectEspecialidad" class="form-select form-select-sm">
+            <option value="">-- Todas las especialidades --</option>
+            <% especialidades.forEach(esp => { %>
+              <option value="<%= esp.id_especialidad %>"><%= esp.nombre %></option>
+            <% }); %>
+          </select>
+        </div>
       </div>
 
       <div class="card-body p-0">
@@ -111,6 +125,27 @@
 </div>
 
 <script>
+  document.getElementById('selectEspecialidad').addEventListener('change', function() {
+    const selectedId = this.value;
+    const rows = document.querySelectorAll('table tbody tr');
+    
+    rows.forEach(row => {
+      const especialidad = row.querySelector('td:nth-child(2)');
+      if (!selectedId) {
+        row.style.display = '';
+      } else {
+        // Buscar si la especialidad contiene el texto de la opción seleccionada
+        const option = this.options[this.selectedIndex];
+        const selectedName = option.text;
+        if (especialidad.textContent.includes(selectedName)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      }
+    });
+  });
+
   function abrirDetallesMedico(id) {
     fetch(`/personal/medico/${id}`)
       .then(r => r.text())

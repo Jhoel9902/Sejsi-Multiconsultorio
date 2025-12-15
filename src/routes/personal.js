@@ -7,8 +7,32 @@ import { uploadPersonal } from '../config/multer.js';
 const router = Router();
 
 // GET /personal/registrar - Mostrar formulario de registro (solo admin)
-router.get('/personal/registrar', requireAuth, requireRole(['admin']), (req, res) => {
-  res.render('personal/registrar', { user: req.user, error: null, success: null });
+router.get('/personal/registrar', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    // Obtener especialidades para el formulario (si es médico)
+    const [especialidades] = await pool.query('CALL sp_esp_listar()');
+    const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
+
+    // Obtener roles
+    const [roles] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
+
+    res.render('personal/registrar', { 
+      user: req.user, 
+      error: null, 
+      success: null,
+      especialidades: esps,
+      roles: roles
+    });
+  } catch (err) {
+    console.error('Error loading registrar form', err);
+    res.render('personal/registrar', { 
+      user: req.user, 
+      error: 'Error al cargar el formulario', 
+      success: null,
+      especialidades: [],
+      roles: []
+    });
+  }
 });
 
 // POST /personal - Registrar personal (solo admin)
@@ -27,7 +51,14 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     correo,
     contrasena,
     contrasena_confirm,
+    especialidades = [], // Especialidades seleccionadas (array)
   } = req.body;
+
+  // Cargar especialidades y roles para la vista (en caso de error)
+  const [espsData] = await pool.query('CALL sp_esp_listar()');
+  const especialidadesDisponibles = Array.isArray(espsData) ? espsData[0] : espsData;
+  
+  const [rolesData] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
 
   // Validar contraseñas coincidan
   if (contrasena !== contrasena_confirm) {
@@ -35,6 +66,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       user: req.user,
       error: 'Las contraseñas no coinciden.',
       success: null,
+      especialidades: especialidadesDisponibles,
+      roles: rolesData
     });
   }
 
@@ -44,7 +77,28 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       user: req.user,
       error: 'La contraseña debe tener al menos 6 caracteres.',
       success: null,
+      especialidades: especialidadesDisponibles,
+      roles: rolesData
     });
+  }
+
+  // Validar que si es médico, tenga al menos 1 especialidad
+  const [rolData] = await pool.query('SELECT nombre_rol FROM trol WHERE id_rol = ?', [id_rol]);
+  const rol = Array.isArray(rolData) ? rolData[0] : rolData;
+  
+  if (rol && rol.nombre_rol === 'medico') {
+    const espsArray = Array.isArray(especialidades) ? especialidades : [especialidades];
+    const espsFiltered = espsArray.filter(e => e && e.trim());
+    
+    if (espsFiltered.length === 0) {
+      return res.status(400).render('personal/registrar', {
+        user: req.user,
+        error: 'Un médico debe tener al menos una especialidad.',
+        success: null,
+        especialidades: especialidadesDisponibles,
+        roles: rolesData
+      });
+    }
   }
 
   try {
@@ -63,7 +117,7 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       }
     });
 
-    // Llamar SP
+    // Llamar SP para registrar personal
     await pool.query('CALL sp_personal_registrar(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_id, @p_success, @p_msg)', [
       ci,
       nombres,
@@ -84,16 +138,39 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     const [[output]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje, @p_id AS id');
 
     if (output.success) {
+      const idPersonal = output.id;
+
+      // Si es médico, asignar especialidades
+      if (rol && rol.nombre_rol === 'medico') {
+        const espsArray = Array.isArray(especialidades) ? especialidades : [especialidades];
+        const espsFiltered = espsArray.filter(e => e && e.trim());
+
+        for (const idEsp of espsFiltered) {
+          try {
+            await pool.query(
+              'CALL sp_esp_asignar_medico(?, ?, @p_success, @p_msg)',
+              [idPersonal, idEsp]
+            );
+          } catch (espErr) {
+            console.error('Error asignando especialidad:', espErr);
+          }
+        }
+      }
+
       return res.render('personal/registrar', {
         user: req.user,
         error: null,
         success: 'Personal registrado exitosamente.',
+        especialidades: [],
+        roles: []
       });
     } else {
       return res.status(400).render('personal/registrar', {
         user: req.user,
         error: output.mensaje,
         success: null,
+        especialidades: especialidadesDisponibles,
+        roles: rolesData
       });
     }
   } catch (err) {
@@ -102,6 +179,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       user: req.user,
       error: 'Error al registrar personal. Intente nuevamente.',
       success: null,
+      especialidades: especialidadesDisponibles,
+      roles: rolesData
     });
   }
 });
@@ -212,10 +291,14 @@ router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']
     const [result] = await pool.query('CALL sp_personal_listar_medicos()');
     const medicos = Array.isArray(result) ? result[0] : result;
 
-    res.render('personal/medicos', { user: req.user, medicos });
+    // Obtener especialidades para el filtro
+    const [especialidades] = await pool.query('CALL sp_esp_listar()');
+    const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
+
+    res.render('personal/medicos', { user: req.user, medicos, especialidades: esps });
   } catch (err) {
     console.error('Error fetching medicos', err);
-    res.status(500).render('personal/medicos', { user: req.user, medicos: [], error: 'Error al cargar médicos' });
+    res.status(500).render('personal/medicos', { user: req.user, medicos: [], especialidades: [], error: 'Error al cargar médicos' });
   }
 });
 

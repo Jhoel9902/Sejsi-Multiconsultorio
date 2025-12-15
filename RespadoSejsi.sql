@@ -650,6 +650,7 @@ CREATE PROCEDURE `sp_personal_registrar`(
 )
 BEGIN
     DECLARE v_ci_existe INT;
+    DECLARE v_nuevo_id CHAR(36);
     
     -- Validar CI único
     SELECT COUNT(*) INTO v_ci_existe FROM tpersonal WHERE ci = p_ci;
@@ -658,18 +659,22 @@ BEGIN
         SET p_success = FALSE;
         SET p_msg = 'El CI ya está registrado en el sistema.';
     ELSE
-        -- Insertar personal
+        -- Generar UUID para el nuevo personal
+        SET v_nuevo_id = UUID();
+        
+        -- Insertar personal con UUID este se papea alguno SP por que alchile SIUUUU!!!! explícito
         INSERT INTO tpersonal (
-            ci, nombres, apellido_paterno, apellido_materno, cargo, id_rol,
+            id_personal, ci, nombres, apellido_paterno, apellido_materno, cargo, id_rol,
             fecha_nacimiento, fecha_contratacion, domicilio, celular, correo,
             contrasena, foto_perfil, archivo_contrato, estado
         ) VALUES (
-            p_ci, p_nombres, p_apellido_paterno, p_apellido_materno, p_cargo, p_id_rol,
+            v_nuevo_id, p_ci, p_nombres, p_apellido_paterno, p_apellido_materno, p_cargo, p_id_rol,
             p_fecha_nacimiento, p_fecha_contratacion, p_domicilio, p_celular, p_correo,
             p_contrasena, p_foto_perfil, p_archivo_contrato, TRUE
         );
         
-        SET p_id_personal = LAST_INSERT_ID();
+        -- Retornar el UUID generado
+        SET p_id_personal = v_nuevo_id;
         SET p_success = TRUE;
         SET p_msg = 'Personal registrado exitosamente.';
     END IF;

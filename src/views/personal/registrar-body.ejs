@@ -23,7 +23,7 @@
           </div>
         <% } %>
 
-        <form method="post" action="/personal" enctype="multipart/form-data" class="needs-validation" novalidate>
+        <form method="post" action="/personal" enctype="multipart/form-data" accept-charset="UTF-8" class="needs-validation" novalidate id="registroForm">
           <!-- Sección: Información Personal -->
           <h6 class="mb-3 text-uppercase text-muted fw-semibold">
             <i class="bi bi-person me-2"></i>Información Personal
@@ -35,11 +35,17 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Rol <span class="text-danger">*</span></label>
-              <select class="form-select" name="id_rol" required>
+              <select class="form-select" id="idRol" name="id_rol" onchange="actualizarEspecialidades()" required>
                 <option value="">-- Seleccionar rol --</option>
-                <option value="0fe2336b-d854-11f0-9531-40c2ba62ef61">Admin</option>
-                <option value="0fe2393a-d854-11f0-9531-40c2ba62ef61">Ventanilla</option>
-                <option value="0fe23b2d-d854-11f0-9531-40c2ba62ef61">Médico</option>
+                <% if (roles && roles.length > 0) { %>
+                  <% roles.forEach(rol => { %>
+                    <option value="<%= rol.id_rol %>"><%= rol.nombre_rol %></option>
+                  <% }); %>
+                <% } else { %>
+                  <option value="0fe2336b-d854-11f0-9531-40c2ba62ef61">Admin</option>
+                  <option value="0fe2393a-d854-11f0-9531-40c2ba62ef61">Ventanilla</option>
+                  <option value="0fe23b2d-d854-11f0-9531-40c2ba62ef61">Médico</option>
+                <% } %>
               </select>
             </div>
             <div class="col-md-6">
@@ -100,6 +106,47 @@
 
           <hr />
 
+          <!-- Sección: Especialidades (solo para médicos) -->
+          <div id="seccionEspecialidades" style="display: none;">
+            <h6 class="mb-3 text-uppercase text-muted fw-semibold">
+              <i class="bi bi-hospital me-2"></i>Especialidades <span class="text-danger">*</span>
+            </h6>
+            <div class="row g-3 mb-4">
+              <div class="col-12">
+                <label class="form-label">Selecciona al menos una especialidad</label>
+                <div class="row" id="especialidadesContainer">
+                  <% if (especialidades && especialidades.length > 0) { %>
+                    <% especialidades.forEach(esp => { %>
+                      <div class="col-md-6 col-lg-4">
+                        <div class="form-check">
+                          <input 
+                            class="form-check-input" 
+                            type="checkbox" 
+                            name="especialidades" 
+                            value="<%= esp.id_especialidad %>" 
+                            id="esp_<%= esp.id_especialidad %>"
+                          />
+                          <label class="form-check-label" for="esp_<%= esp.id_especialidad %>">
+                            <%= esp.nombre %>
+                          </label>
+                        </div>
+                      </div>
+                    <% }); %>
+                  <% } else { %>
+                    <div class="col-12">
+                      <small class="text-muted"><em>No hay especialidades disponibles</em></small>
+                    </div>
+                  <% } %>
+                </div>
+                <small class="text-muted d-block mt-2">
+                  <i class="bi bi-info-circle me-1"></i>Un médico debe tener al menos una especialidad
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <hr />
+
           <!-- Sección: Credenciales de Acceso -->
           <h6 class="mb-3 text-uppercase text-muted fw-semibold">
             <i class="bi bi-shield-lock me-2"></i>Credenciales de Acceso
@@ -149,3 +196,40 @@
     </div>
   </div>
 </div>
+
+<script>
+  // ID del rol médico (será dinámico desde la BD)
+  const ROLE_MEDICO = '<%= roles.find(r => r.nombre_rol === "medico")?.id_rol || "0fe23b2d-d854-11f0-9531-40c2ba62ef61" %>';
+
+  function actualizarEspecialidades() {
+    const idRol = document.getElementById('idRol').value;
+    const seccion = document.getElementById('seccionEspecialidades');
+    
+    if (idRol === ROLE_MEDICO) {
+      seccion.style.display = 'block';
+    } else {
+      seccion.style.display = 'none';
+      // Desmarcar todas las especialidades si no es médico
+      document.querySelectorAll('input[name="especialidades"]').forEach(cb => cb.checked = false);
+    }
+  }
+
+  // Validar al submit
+  document.getElementById('registroForm').addEventListener('submit', function(e) {
+    const idRol = document.getElementById('idRol').value;
+    
+    if (idRol === ROLE_MEDICO) {
+      const checkboxes = document.querySelectorAll('input[name="especialidades"]:checked');
+      if (checkboxes.length === 0) {
+        e.preventDefault();
+        alert('Debes seleccionar al menos una especialidad para un médico');
+        return false;
+      }
+    }
+  });
+
+  // Ejecutar al cargar la página
+  document.addEventListener('DOMContentLoaded', function() {
+    actualizarEspecialidades();
+  });
+</script>

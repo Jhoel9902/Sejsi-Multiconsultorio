@@ -36,14 +36,14 @@
               <h6 class="mb-3"><i class="bi bi-check2-circle me-2"></i>Especialidades Actuales</h6>
               
               <div id="especialidadesActuales_<%= medico.id_personal %>" class="mb-3">
-                <% if (medico.especialidades) { %>
-                  <% medico.especialidades.split(', ').forEach(esp => { %>
-                    <span class="badge bg-success me-2 mb-2">
-                      <%= esp %>
+                <% if (medico.especialidades_array && medico.especialidades_array.length > 0) { %>
+                  <% medico.especialidades_array.forEach(esp => { %>
+                    <span class="badge bg-success me-2 mb-2" data-id="<%= esp.id_especialidad %>">
+                      <%= esp.nombre %>
                       <button 
                         type="button" 
                         class="btn-close btn-close-white ms-1"
-                        onclick="quitarEspecialidad('<%= medico.id_personal %>', '<%= esp %>')"
+                        onclick="quitarEspecialidad('<%= medico.id_personal %>', '<%= esp.id_especialidad %>')"
                         style="font-size: 0.7rem;"
                       ></button>
                     </span>
@@ -98,17 +98,32 @@
     }
 
     const [idEsp, nombre] = value.split('|');
+    
+    // Validar que no esté ya asignada
+    const container = document.getElementById(`especialidadesActuales_${idPersonal}`);
+    const badges = container.querySelectorAll('[data-id]');
+    for (const badge of badges) {
+      if (badge.dataset.id === idEsp) {
+        alert('Esta especialidad ya está asignada a este médico');
+        return;
+      }
+    }
 
     fetch(`/especialidades/asignar/${idPersonal}/${idEsp}`, { method: 'POST' })
       .then(r => r.json())
       .then(data => {
         if (data.success) {
           // Agregar badge
-          const container = document.getElementById(`especialidadesActuales_${idPersonal}`);
           const badge = document.createElement('span');
           badge.className = 'badge bg-success me-2 mb-2';
-          badge.innerHTML = `${nombre} <button type="button" class="btn-close btn-close-white ms-1" onclick="quitarEspecialidad('${idPersonal}', '${nombre}')" style="font-size: 0.7rem;"></button>`;
-          container.innerHTML += badge.outerHTML;
+          badge.dataset.id = idEsp;
+          badge.innerHTML = `${nombre} <button type="button" class="btn-close btn-close-white ms-1" onclick="quitarEspecialidad('${idPersonal}', '${idEsp}')" style="font-size: 0.7rem;"></button>`;
+          
+          // Agregar espacio si está vacío
+          if (container.querySelector('em')) {
+            container.innerHTML = '';
+          }
+          container.appendChild(badge);
           
           select.value = '';
           alert('Especialidad asignada');
@@ -122,25 +137,8 @@
       });
   }
 
-  function quitarEspecialidad(idPersonal, nombre) {
-    // Buscar el id de especialidad
-    const select = document.getElementById(`selectEsp_${idPersonal}`);
-    let idEsp = null;
-    
-    for (let option of select.options) {
-      if (option.textContent === nombre) {
-        const [id] = option.value.split('|');
-        idEsp = id;
-        break;
-      }
-    }
-
-    if (!idEsp) {
-      alert('Error: No se encontró la especialidad');
-      return;
-    }
-
-    if (!confirm(`¿Eliminar especialidad "${nombre}"?`)) return;
+  function quitarEspecialidad(idPersonal, idEsp) {
+    if (!confirm('¿Eliminar especialidad?')) return;
 
     fetch(`/especialidades/quitar/${idPersonal}/${idEsp}`, { method: 'POST' })
       .then(r => r.json())
