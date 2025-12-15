@@ -1030,6 +1030,159 @@ CREATE TABLE IF NOT EXISTS `tservicio` (
   UNIQUE KEY `nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ========================================
+-- STORED PROCEDURES PARA ESPECIALIDADES
+-- ========================================
+
+-- SP: Registrar nueva especialidad
+DELIMITER //
+CREATE PROCEDURE `sp_esp_registrar`(
+  IN p_nombre VARCHAR(50),
+  IN p_descripcion TEXT,
+  OUT p_id_especialidad CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al registrar especialidad';
+  END;
+  
+  IF p_nombre IS NULL OR p_nombre = '' THEN
+    SET p_success = FALSE;
+    SET p_msg = 'El nombre es requerido';
+  ELSEIF EXISTS(SELECT 1 FROM tespecialidad WHERE nombre = p_nombre AND estado = TRUE) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'El nombre de especialidad ya existe';
+  ELSE
+    SET p_id_especialidad = UUID();
+    INSERT INTO tespecialidad (id_especialidad, nombre, descripcion, estado)
+    VALUES (p_id_especialidad, p_nombre, p_descripcion, TRUE);
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad registrada exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+-- SP: Listar especialidades activas
+DELIMITER //
+CREATE PROCEDURE `sp_esp_listar`()
+BEGIN
+  SELECT id_especialidad, nombre, descripcion, fecha_creacion, estado
+  FROM tespecialidad
+  WHERE estado = TRUE
+  ORDER BY nombre ASC;
+END//
+DELIMITER ;
+
+-- SP: Obtener especialidad por ID
+DELIMITER //
+CREATE PROCEDURE `sp_esp_obtener_por_id`(IN p_id_especialidad CHAR(36))
+BEGIN
+  SELECT id_especialidad, nombre, descripcion, fecha_creacion, estado
+  FROM tespecialidad
+  WHERE id_especialidad = p_id_especialidad;
+END//
+DELIMITER ;
+
+-- SP: Actualizar especialidad
+DELIMITER //
+CREATE PROCEDURE `sp_esp_actualizar`(
+  IN p_id_especialidad CHAR(36),
+  IN p_nombre VARCHAR(50),
+  IN p_descripcion TEXT,
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al actualizar especialidad';
+  END;
+  
+  IF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Especialidad no encontrada';
+  ELSEIF EXISTS(SELECT 1 FROM tespecialidad WHERE nombre = p_nombre AND id_especialidad != p_id_especialidad AND estado = TRUE) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'El nombre de especialidad ya existe';
+  ELSE
+    UPDATE tespecialidad
+    SET nombre = p_nombre, descripcion = p_descripcion
+    WHERE id_especialidad = p_id_especialidad;
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad actualizada exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+-- SP: Asignar especialidad a un médico
+DELIMITER //
+CREATE PROCEDURE `sp_esp_asignar_medico`(
+  IN p_id_personal CHAR(36),
+  IN p_id_especialidad CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al asignar especialidad';
+  END;
+  
+  IF NOT EXISTS(SELECT 1 FROM tpersonal WHERE id_personal = p_id_personal) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Personal no encontrado';
+  ELSEIF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Especialidad no encontrada';
+  ELSEIF EXISTS(SELECT 1 FROM tpersonal_especialidad WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad) THEN
+    -- Si ya existe pero está inactiva, reactivarla
+    UPDATE tpersonal_especialidad
+    SET estado = TRUE
+    WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad;
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad asignada exitosamente';
+  ELSE
+    INSERT INTO tpersonal_especialidad (id_personal, id_especialidad, estado)
+    VALUES (p_id_personal, p_id_especialidad, TRUE);
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad asignada exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+-- SP: Quitar especialidad a un médico
+DELIMITER //
+CREATE PROCEDURE `sp_esp_quitar_medico`(
+  IN p_id_personal CHAR(36),
+  IN p_id_especialidad CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al quitar especialidad';
+  END;
+  
+  IF NOT EXISTS(SELECT 1 FROM tpersonal_especialidad WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'La especialidad no estaba asignada';
+  ELSE
+    UPDATE tpersonal_especialidad
+    SET estado = FALSE
+    WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad;
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad removida exitosamente';
+  END IF;
+END//
+DELIMITER ;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

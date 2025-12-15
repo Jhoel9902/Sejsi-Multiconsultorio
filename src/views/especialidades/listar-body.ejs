@@ -1,0 +1,129 @@
+<div class="container py-4">
+  <div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <div>
+        <h2><i class="bi bi-hospital me-2"></i>Especialidades Médicas</h2>
+        <p class="text-muted">Gestiona las especialidades disponibles en el sistema</p>
+      </div>
+      <a href="/especialidades/registrar" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-2"></i>Nueva Especialidad
+      </a>
+    </div>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+      <i class="bi bi-exclamation-triangle me-2"></i><%= error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  <% } %>
+
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead class="table-light">
+        <tr>
+          <th><i class="bi bi-hospital me-2"></i>Nombre</th>
+          <th>Descripción</th>
+          <th class="text-center">Fecha de Creación</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (especialidades && especialidades.length > 0) { %>
+          <% especialidades.forEach(esp => { %>
+            <tr>
+              <td>
+                <strong><%= esp.nombre %></strong>
+              </td>
+              <td>
+                <small class="text-muted"><%= esp.descripcion || 'Sin descripción' %></small>
+              </td>
+              <td class="text-center text-muted small">
+                <%= new Date(esp.fecha_creacion).toLocaleDateString('es-ES') %>
+              </td>
+              <td class="text-center">
+                <button 
+                  class="btn btn-sm btn-outline-primary"
+                  onclick="editarEspecialidad('<%= esp.id_especialidad %>')"
+                  title="Editar"
+                >
+                  <i class="bi bi-pencil"></i>
+                </button>
+              </td>
+            </tr>
+          <% }); %>
+        <% } else { %>
+          <tr>
+            <td colspan="4" class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 2rem;"></i>
+              <p class="text-muted mt-3">No hay especialidades registradas</p>
+              <a href="/especialidades/registrar" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-circle me-2"></i>Crear Primera Especialidad
+              </a>
+            </td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal para editar -->
+<div class="modal fade" id="editarModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar Especialidad</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Cargado dinámicamente -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function editarEspecialidad(id) {
+    fetch(`/especialidades/obtener/${id}`)
+      .then(r => r.text())
+      .then(html => {
+        document.getElementById('modalBody').innerHTML = html;
+        new bootstrap.Modal(document.getElementById('editarModal')).show();
+      })
+      .catch(err => {
+        alert('Error al cargar especialidad');
+        console.error(err);
+      });
+  }
+
+  function guardarEdicion(id) {
+    const nombre = document.getElementById('editNombre').value;
+    const descripcion = document.getElementById('editDescripcion').value;
+
+    // Validar nombre
+    if (!/^[a-záéíóúñ\s]+$/i.test(nombre)) {
+      alert('El nombre debe contener solo letras y espacios');
+      return;
+    }
+
+    fetch(`/especialidades/editar/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nombre, descripcion })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          alert('Especialidad actualizada');
+          location.reload();
+        } else {
+          alert(data.error || 'Error al actualizar');
+        }
+      })
+      .catch(err => {
+        alert('Error al actualizar especialidad');
+        console.error(err);
+      });
+  }
+</script>

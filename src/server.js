@@ -6,6 +6,7 @@ import authRouter from './routes/auth.js';
 import dashboardRouter from './routes/dashboard.js';
 import pacientesRouter from './routes/pacientes.js';
 import personalRouter from './routes/personal.js';
+import especialidadesRouter from './routes/especialidades.js';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -39,6 +40,7 @@ app.use(authRouter);
 app.use(dashboardRouter);
 app.use(pacientesRouter);
 app.use(personalRouter);
+app.use(especialidadesRouter);
 
 // 404 - Página no encontrada
 app.use((req, res) => {

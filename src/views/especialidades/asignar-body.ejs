@@ -1,0 +1,159 @@
+<div class="container py-4">
+  <div class="row mb-4">
+    <div class="col-12">
+      <h2><i class="bi bi-link-45deg me-2"></i>Asignar Especialidades a Médicos</h2>
+      <p class="text-muted">Gestiona las especialidades de cada médico</p>
+    </div>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+      <i class="bi bi-exclamation-triangle me-2"></i><%= error %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  <% } %>
+
+  <div class="row">
+    <% if (medicos && medicos.length > 0) { %>
+      <% medicos.forEach(medico => { %>
+        <div class="col-12 col-lg-6 mb-4">
+          <div class="card h-100">
+            <div class="card-header bg-light">
+              <div class="d-flex align-items-center gap-3">
+                <% if (medico.foto_perfil) { %>
+                  <img src="<%= medico.foto_perfil %>" alt="Foto" 
+                    style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;" 
+                    onerror="this.style.display='none';" />
+                <% } %>
+                <div>
+                  <h5 class="mb-0"><%= medico.nombres %> <%= medico.apellido_paterno %></h5>
+                  <small class="text-muted">ID: <%= medico.id_personal %></small>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <h6 class="mb-3"><i class="bi bi-check2-circle me-2"></i>Especialidades Actuales</h6>
+              
+              <div id="especialidadesActuales_<%= medico.id_personal %>" class="mb-3">
+                <% if (medico.especialidades) { %>
+                  <% medico.especialidades.split(', ').forEach(esp => { %>
+                    <span class="badge bg-success me-2 mb-2">
+                      <%= esp %>
+                      <button 
+                        type="button" 
+                        class="btn-close btn-close-white ms-1"
+                        onclick="quitarEspecialidad('<%= medico.id_personal %>', '<%= esp %>')"
+                        style="font-size: 0.7rem;"
+                      ></button>
+                    </span>
+                  <% }); %>
+                <% } else { %>
+                  <small class="text-muted"><em>Sin especialidades asignadas</em></small>
+                <% } %>
+              </div>
+
+              <h6 class="mb-3"><i class="bi bi-plus-circle me-2"></i>Agregar Especialidad</h6>
+              
+              <div class="input-group">
+                <select id="selectEsp_<%= medico.id_personal %>" class="form-select">
+                  <option value="">-- Selecciona una especialidad --</option>
+                  <% especialidades.forEach(esp => { %>
+                    <option value="<%= esp.id_especialidad %>|<%= esp.nombre %>">
+                      <%= esp.nombre %>
+                    </option>
+                  <% }); %>
+                </select>
+                <button 
+                  class="btn btn-primary" 
+                  type="button"
+                  onclick="asignarEspecialidad('<%= medico.id_personal %>')"
+                >
+                  <i class="bi bi-plus me-1"></i>Agregar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    <% } else { %>
+      <div class="col-12">
+        <div class="alert alert-info text-center py-5">
+          <i class="bi bi-info-circle me-2"></i>
+          <p class="mb-0">No hay médicos registrados en el sistema</p>
+        </div>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<script>
+  function asignarEspecialidad(idPersonal) {
+    const select = document.getElementById(`selectEsp_${idPersonal}`);
+    const value = select.value;
+    
+    if (!value) {
+      alert('Selecciona una especialidad');
+      return;
+    }
+
+    const [idEsp, nombre] = value.split('|');
+
+    fetch(`/especialidades/asignar/${idPersonal}/${idEsp}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          // Agregar badge
+          const container = document.getElementById(`especialidadesActuales_${idPersonal}`);
+          const badge = document.createElement('span');
+          badge.className = 'badge bg-success me-2 mb-2';
+          badge.innerHTML = `${nombre} <button type="button" class="btn-close btn-close-white ms-1" onclick="quitarEspecialidad('${idPersonal}', '${nombre}')" style="font-size: 0.7rem;"></button>`;
+          container.innerHTML += badge.outerHTML;
+          
+          select.value = '';
+          alert('Especialidad asignada');
+        } else {
+          alert(data.error || 'Error al asignar');
+        }
+      })
+      .catch(err => {
+        alert('Error');
+        console.error(err);
+      });
+  }
+
+  function quitarEspecialidad(idPersonal, nombre) {
+    // Buscar el id de especialidad
+    const select = document.getElementById(`selectEsp_${idPersonal}`);
+    let idEsp = null;
+    
+    for (let option of select.options) {
+      if (option.textContent === nombre) {
+        const [id] = option.value.split('|');
+        idEsp = id;
+        break;
+      }
+    }
+
+    if (!idEsp) {
+      alert('Error: No se encontró la especialidad');
+      return;
+    }
+
+    if (!confirm(`¿Eliminar especialidad "${nombre}"?`)) return;
+
+    fetch(`/especialidades/quitar/${idPersonal}/${idEsp}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || 'Error al quitar');
+        }
+      })
+      .catch(err => {
+        alert('Error');
+        console.error(err);
+      });
+  }
+</script>
