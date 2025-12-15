@@ -45,7 +45,7 @@ export const uploadPersonal = multer({
       if (allowedMimes.includes(file.mimetype)) {
         cb(null, true);
       } else {
-        cb(new Error('Solo se permiten imágenes (JPG, PNG)'), false);
+        cb(new Error('Solo se permiten imágenes (JPG, JPEG, PNG)'), false);
       }
     }
     // Filtro para PDFs
@@ -60,5 +60,5 @@ export const uploadPersonal = multer({
       cb(null, true);
     }
   },
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB máximo
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB máximo
 });

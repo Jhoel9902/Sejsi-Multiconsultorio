@@ -1,11 +1,23 @@
 <div class="row">
   <div class="col-12">
     <div class="card">
-      <div class="card-header border-bottom bg-light d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-stethoscope me-2"></i>Médicos Disponibles</h5>
-        <button class="btn btn-sm btn-outline-secondary" id="btnFiltro" data-bs-toggle="collapse" data-bs-target="#filtroEspecialidad">
-          <i class="bi bi-funnel me-1"></i>Filtrar por Especialidad
-        </button>
+      <div class="card-header border-bottom bg-light">
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <h5 class="mb-0"><i class="bi bi-stethoscope me-2"></i>Médicos Disponibles</h5>
+          <div class="d-flex gap-2 align-items-center" style="flex: 1; max-width: 400px;">
+            <input 
+              type="text" 
+              id="buscarMedico" 
+              class="form-control form-control-sm" 
+              placeholder="Buscar por CI o nombre..."
+              value="<%= termino_busqueda || '' %>"
+              style="flex: 1;"
+            />
+            <button class="btn btn-sm btn-outline-secondary" id="btnFiltro" data-bs-toggle="collapse" data-bs-target="#filtroEspecialidad">
+              <i class="bi bi-funnel me-1"></i>Filtrar
+            </button>
+          </div>
+        </div>
       </div>
 
       <div class="collapse" id="filtroEspecialidad">
@@ -125,26 +137,80 @@
 </div>
 
 <script>
-  document.getElementById('selectEspecialidad').addEventListener('change', function() {
-    const selectedId = this.value;
-    const rows = document.querySelectorAll('table tbody tr');
+  // Datos originales de médicos
+  const medicosData = <%- JSON.stringify(medicos) %>;
+
+  // Función para filtrar médicos
+  function filtrarMedicos() {
+    const textoBusqueda = document.getElementById('buscarMedico').value.toLowerCase().trim();
+    const especialidadSeleccionada = document.getElementById('selectEspecialidad').value;
     
-    rows.forEach(row => {
-      const especialidad = row.querySelector('td:nth-child(2)');
-      if (!selectedId) {
+    const tbody = document.querySelector('table tbody');
+    if (!tbody) return;
+
+    const rows = tbody.querySelectorAll('tr');
+    let resultadosVisibles = 0;
+
+    rows.forEach((row, index) => {
+      const medico = medicosData[index];
+      if (!medico) return;
+
+      let cumpleBusqueda = true;
+      let cumpleEspecialidad = true;
+
+      // Filtrar por búsqueda de CI o nombre
+      if (textoBusqueda) {
+        const nombreCompleto = `${medico.nombres} ${medico.apellido_paterno} ${medico.apellido_materno || ''}`.toLowerCase();
+        const ci = (medico.ci || '').toLowerCase();
+        
+        cumpleBusqueda = ci.includes(textoBusqueda) || nombreCompleto.includes(textoBusqueda);
+      }
+
+      // Filtrar por especialidad
+      if (especialidadSeleccionada && medico.especialidades) {
+        const especialidades = medico.especialidades.split(', ');
+        // Buscar la opción seleccionada
+        const selectEspecialidad = document.getElementById('selectEspecialidad');
+        const optionSeleccionada = selectEspecialidad.options[selectEspecialidad.selectedIndex];
+        const nombreEspecialidadSeleccionada = optionSeleccionada.text;
+        
+        cumpleEspecialidad = especialidades.some(esp => 
+          esp.trim().toLowerCase() === nombreEspecialidadSeleccionada.toLowerCase()
+        );
+      }
+
+      // Mostrar/ocultar fila
+      if (cumpleBusqueda && cumpleEspecialidad) {
         row.style.display = '';
+        resultadosVisibles++;
       } else {
-        // Buscar si la especialidad contiene el texto de la opción seleccionada
-        const option = this.options[this.selectedIndex];
-        const selectedName = option.text;
-        if (especialidad.textContent.includes(selectedName)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
+        row.style.display = 'none';
       }
     });
-  });
+
+    // Mostrar mensaje si no hay resultados
+    let mensajeVacio = document.getElementById('mensajeVacioFiltrado');
+    if (resultadosVisibles === 0) {
+      if (!mensajeVacio) {
+        const cardBody = document.querySelector('.card-body.p-0');
+        mensajeVacio = document.createElement('div');
+        mensajeVacio.id = 'mensajeVacioFiltrado';
+        mensajeVacio.className = 'p-4 text-center text-muted';
+        mensajeVacio.innerHTML = `
+          <i class="bi bi-search" style="font-size: 2rem; opacity: 0.5;"></i>
+          <p class="mt-2">No hay médicos que coincidan con los filtros</p>
+        `;
+        cardBody.appendChild(mensajeVacio);
+      }
+      mensajeVacio.style.display = '';
+    } else if (mensajeVacio) {
+      mensajeVacio.style.display = 'none';
+    }
+  }
+
+  // Event listeners
+  document.getElementById('buscarMedico').addEventListener('input', filtrarMedicos);
+  document.getElementById('selectEspecialidad').addEventListener('change', filtrarMedicos);
 
   function abrirDetallesMedico(id) {
     fetch(`/personal/medico/${id}`)

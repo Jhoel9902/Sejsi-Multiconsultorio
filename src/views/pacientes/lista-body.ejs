@@ -169,13 +169,20 @@ async function manejarSubmitModal(e) {
   submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...';
   
   try {
+    // Convertir FormData a objeto JSON para mejor compatibilidad
     const formData = new FormData(form);
+    const data = {};
+    formData.forEach((value, key) => {
+      data[key] = value;
+    });
+    
     const response = await fetch(url, {
       method: 'POST',
-      body: formData,
       headers: {
+        'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest'
-      }
+      },
+      body: JSON.stringify(data)
     });
     
     if (response.ok) {

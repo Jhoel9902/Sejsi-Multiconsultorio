@@ -533,6 +533,7 @@ CREATE PROCEDURE `sp_personal_listar_medicos`()
 BEGIN
   SELECT 
     p.id_personal,
+    p.ci,
     p.nombres,
     p.apellido_paterno,
     p.apellido_materno,

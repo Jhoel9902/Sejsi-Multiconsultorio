@@ -60,22 +60,95 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
   
   const [rolesData] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
 
+  // Validaciones
+  const errors = [];
+
+  // Validar CI
+  if (!ci || ci.trim() === '') {
+    errors.push('El CI es obligatorio.');
+  } else if (!/^[0-9]{7,8}[A-Z]?$/.test(ci)) {
+    errors.push('El CI debe tener 7-8 dígitos más una letra opcional (formato boliviano).');
+  }
+
+  // Validar nombres
+  if (!nombres || nombres.trim() === '') {
+    errors.push('El nombre es obligatorio.');
+  } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombres)) {
+    errors.push('El nombre solo puede contener letras y espacios.');
+  }
+
+  // Validar apellido paterno
+  if (!apellido_paterno || apellido_paterno.trim() === '') {
+    errors.push('El apellido paterno es obligatorio.');
+  } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_paterno)) {
+    errors.push('El apellido paterno solo puede contener letras y espacios.');
+  }
+
+  // Validar apellido materno si se proporciona
+  if (apellido_materno && apellido_materno.trim() !== '' && !/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_materno)) {
+    errors.push('El apellido materno solo puede contener letras y espacios.');
+  }
+
+  // Validar teléfono
+  if (!celular || celular.trim() === '') {
+    errors.push('El celular es obligatorio.');
+  } else if (!/^[0-9]{10,11}$/.test(celular.replace(/\D/g, ''))) {
+    errors.push('El celular debe tener 10-11 dígitos.');
+  }
+
+  // Validar fecha de nacimiento y edad (mínimo 18 años)
+  if (!fecha_nacimiento) {
+    errors.push('La fecha de nacimiento es obligatoria.');
+  } else {
+    const [birthYear, birthMonth, birthDay] = fecha_nacimiento.split('-');
+    const birthDate = new Date(birthYear, parseInt(birthMonth) - 1, birthDay);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      errors.push('Debe ser mayor de 18 años para registrarse como personal.');
+    } else if (age > 100) {
+      errors.push('La edad debe ser menor a 100 años.');
+    }
+  }
+
+  // Validar fecha de contratación
+  if (!fecha_contratacion) {
+    errors.push('La fecha de contratación es obligatoria.');
+  }
+
+  // Validar correo si se proporciona
+  if (correo && correo.trim() !== '') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) {
+      errors.push('El correo electrónico no es válido.');
+    } else {
+      // Validar que el correo sea único
+      const [existingEmail] = await pool.query('SELECT COUNT(*) as count FROM tpersonal WHERE correo = ? AND estado = TRUE', [correo]);
+      if (existingEmail && existingEmail.length > 0 && existingEmail[0].count > 0) {
+        errors.push('Este correo electrónico ya está registrado en el sistema.');
+      }
+    }
+  }
+
   // Validar contraseñas coincidan
   if (contrasena !== contrasena_confirm) {
-    return res.status(400).render('personal/registrar', {
-      user: req.user,
-      error: 'Las contraseñas no coinciden.',
-      success: null,
-      especialidades: especialidadesDisponibles,
-      roles: rolesData
-    });
+    errors.push('Las contraseñas no coinciden.');
   }
 
   // Validar contraseña mínima
   if (contrasena.length < 6) {
+    errors.push('La contraseña debe tener al menos 6 caracteres.');
+  }
+
+  // Si hay errores de validación, devolver formulario
+  if (errors.length > 0) {
     return res.status(400).render('personal/registrar', {
       user: req.user,
-      error: 'La contraseña debe tener al menos 6 caracteres.',
+      error: errors.join(' '),
       success: null,
       especialidades: especialidadesDisponibles,
       roles: rolesData
@@ -122,13 +195,13 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       ci,
       nombres,
       apellido_paterno,
-      apellido_materno,
+      apellido_materno || null,
       cargo,
       id_rol,
       fecha_nacimiento || null,
       fecha_contratacion || null,
       domicilio || null,
-      celular || null,
+      celular,
       correo || null,
       contrasenaHasheada,
       fotoRuta,
@@ -239,6 +312,90 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
     correo,
   } = req.body;
 
+  // Validaciones
+  const errors = [];
+
+  // Validar CI
+  if (!ci || ci.trim() === '') {
+    errors.push('El CI es obligatorio.');
+  } else if (!/^[0-9]{7,8}[A-Z]?$/.test(ci)) {
+    errors.push('El CI debe tener 7-8 dígitos más una letra opcional (formato boliviano).');
+  }
+
+  // Validar nombres
+  if (!nombres || nombres.trim() === '') {
+    errors.push('El nombre es obligatorio.');
+  } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombres)) {
+    errors.push('El nombre solo puede contener letras y espacios.');
+  }
+
+  // Validar apellido paterno
+  if (!apellido_paterno || apellido_paterno.trim() === '') {
+    errors.push('El apellido paterno es obligatorio.');
+  } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_paterno)) {
+    errors.push('El apellido paterno solo puede contener letras y espacios.');
+  }
+
+  // Validar apellido materno si se proporciona
+  if (apellido_materno && apellido_materno.trim() !== '' && !/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_materno)) {
+    errors.push('El apellido materno solo puede contener letras y espacios.');
+  }
+
+  // Validar teléfono
+  if (!celular || celular.trim() === '') {
+    errors.push('El celular es obligatorio.');
+  } else if (!/^[0-9]{10,11}$/.test(celular.replace(/\D/g, ''))) {
+    errors.push('El celular debe tener 10-11 dígitos.');
+  }
+
+  // Validar fecha de nacimiento y edad (mínimo 18 años)
+  if (!fecha_nacimiento) {
+    errors.push('La fecha de nacimiento es obligatoria.');
+  } else {
+    const [birthYear, birthMonth, birthDay] = fecha_nacimiento.split('-');
+    const birthDate = new Date(birthYear, parseInt(birthMonth) - 1, birthDay);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    if (age < 18) {
+      errors.push('Debe ser mayor de 18 años para registrarse como personal.');
+    } else if (age > 100) {
+      errors.push('La edad debe ser menor a 100 años.');
+    }
+  }
+
+  // Validar fecha de contratación
+  if (!fecha_contratacion) {
+    errors.push('La fecha de contratación es obligatoria.');
+  }
+
+  // Validar correo si se proporciona
+  if (correo && correo.trim() !== '') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(correo)) {
+      errors.push('El correo electrónico no es válido.');
+    } else {
+      // Validar que el correo sea único (excepto si es el mismo correo del usuario que se edita)
+      const [personalActual] = await pool.query('SELECT correo FROM tpersonal WHERE id_personal = ?', [id]);
+      const correoAnterior = personalActual && personalActual.length > 0 ? personalActual[0].correo : null;
+      
+      if (correo !== correoAnterior) {
+        const [existingEmail] = await pool.query('SELECT COUNT(*) as count FROM tpersonal WHERE correo = ? AND estado = TRUE AND id_personal != ?', [correo, id]);
+        if (existingEmail && existingEmail.length > 0 && existingEmail[0].count > 0) {
+          errors.push('Este correo electrónico ya está registrado en el sistema.');
+        }
+      }
+    }
+  }
+
+  // Si hay errores de validación
+  if (errors.length > 0) {
+    return res.status(400).json({ success: false, error: errors.join(' ') });
+  }
+
   try {
     // Obtener rutas de archivos si existen
     let fotoRuta = null;
@@ -260,13 +417,13 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
       ci,
       nombres,
       apellido_paterno,
-      apellido_materno,
+      apellido_materno || null,
       cargo,
       id_rol,
       fecha_nacimiento || null,
       fecha_contratacion || null,
       domicilio || null,
-      celular || null,
+      celular,
       correo || null,
       fotoRuta,
       contratoRuta,
@@ -288,16 +445,38 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
 // GET /personal/medicos - Listar médicos disponibles (admin, ventanilla)
 router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   try {
+    const q = req.query.q || ''; // Buscar por CI o nombre
+    let medicos = [];
+
+    // Obtener datos de médicos
     const [result] = await pool.query('CALL sp_personal_listar_medicos()');
-    const medicos = Array.isArray(result) ? result[0] : result;
+    medicos = Array.isArray(result) ? result[0] : result;
+
+    // Filtrar si hay búsqueda
+    if (q.trim().length > 0) {
+      const queryLower = q.toLowerCase().trim();
+      medicos = medicos.filter(m => {
+        const nombreCompleto = `${m.nombres} ${m.apellido_paterno} ${m.apellido_materno || ''}`.toLowerCase();
+        return m.ci.includes(queryLower) || nombreCompleto.includes(queryLower);
+      });
+    }
 
     // Obtener especialidades para el filtro
     const [especialidades] = await pool.query('CALL sp_esp_listar()');
     const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
 
-    res.render('personal/medicos', { user: req.user, medicos, especialidades: esps });
+    // Si es búsqueda AJAX, devolver JSON
+    if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+      return res.json({ medicos });
+    }
+
+    // Si no es AJAX, renderizar página completa
+    res.render('personal/medicos', { user: req.user, medicos, especialidades: esps, termino_busqueda: q });
   } catch (err) {
     console.error('Error fetching medicos', err);
+    if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+      return res.status(500).json({ error: 'Error al buscar médicos.' });
+    }
     res.status(500).render('personal/medicos', { user: req.user, medicos: [], especialidades: [], error: 'Error al cargar médicos' });
   }
 });

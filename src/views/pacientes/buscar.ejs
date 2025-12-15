@@ -92,6 +92,13 @@
                   Se encontraron <strong><%= pacientes.length %></strong> resultado<%= pacientes.length !== 1 ? 's' : '' %>
                 </h5>
               </div>
+              
+              <% if (pacientes.length >= 50) { %>
+                <div class="alert alert-info mb-3" role="alert">
+                  <i class="bi bi-info-circle me-2"></i>
+                  <strong>Resultados limitados:</strong> Se muestran máximo 50 resultados. Refine su búsqueda para obtener resultados más específicos.
+                </div>
+              <% } %>
 
               <div class="row">
                 <% pacientes.forEach(p => { %>

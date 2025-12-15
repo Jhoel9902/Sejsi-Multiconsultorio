@@ -28,6 +28,17 @@ app.use((req, res, next) => {
 // Configurar codificación UTF-8 para caracteres especiales
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb', parameterLimit: 50 }));
+
+// Middleware personalizado para parsear FormData cuando no hay archivos
+app.use((req, res, next) => {
+  // Si el Content-Type es multipart/form-data pero no hay archivos siendo subidos,
+  // convertir a urlencoded parsing
+  if (req.is('multipart/*') && !req.path.includes('/personal/') && !req.path.includes('/uploads')) {
+    // Para pacientes y otras rutas sin archivo, esperar que Express maneje correctamente
+    // Si hay problemas, Express ya tiene parsers configurados
+  }
+  next();
+});
 app.use(cookieParser());
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));

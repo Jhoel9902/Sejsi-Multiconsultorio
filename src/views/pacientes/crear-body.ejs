@@ -8,42 +8,43 @@
           <div class="alert alert-danger"><%= error %></div>
         <% } %>
 
-        <form method="post" action="/pacientes" class="needs-validation" novalidate>
+        <form method="post" action="/pacientes" class="needs-validation" novalidate accept-charset="UTF-8">
           <div class="row g-3">
             <!-- Datos personales -->
             <h6 class="col-12 mt-3 text-muted">Datos personales</h6>
             
             <div class="col-md-6">
               <label class="form-label">Nombre <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="nombre" required />
+              <input type="text" class="form-control" name="nombre" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido paterno <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="apellido_paterno" required />
+              <input type="text" class="form-control" name="apellido_paterno" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido materno</label>
-              <input type="text" class="form-control" name="apellido_materno" />
+              <input type="text" class="form-control" name="apellido_materno" pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]*$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Fecha de nacimiento</label>
-              <input type="date" class="form-control" name="fecha_nacimiento" />
+              <label class="form-label">Fecha de nacimiento <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="fecha_nacimiento" required />
+              <small class="form-text text-muted">Debe ser mayor de 1 año y menor de 100 años</small>
             </div>
 
             <!-- Documentos y contacto -->
             <h6 class="col-12 mt-3 text-muted">Documentos e identificación</h6>
 
             <div class="col-md-6">
-              <label class="form-label">Cédula de identidad</label>
-              <input type="text" class="form-control" name="ci" />
+              <label class="form-label">Cédula de identidad <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="ci" required pattern="^[0-9]{7,8}[A-Z]?$" title="Formato: 7-8 dígitos + letra opcional" placeholder="Ej: 12345678 o 12345678A" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Correo electrónico</label>
               <input type="email" class="form-control" name="correo" />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Teléfono/Celular</label>
-              <input type="tel" class="form-control" name="celular" />
+              <label class="form-label">Teléfono/Celular <span class="text-danger">*</span></label>
+              <input type="tel" class="form-control" name="celular" required pattern="^[0-9]{10,11}$" title="10-11 dígitos sin espacios" placeholder="Ej: 71234567" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Nacionalidad</label>

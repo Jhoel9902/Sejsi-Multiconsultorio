@@ -66,12 +66,13 @@
     </h6>
     <div class="row g-3 mb-4">
       <div class="col-md-6">
-        <label class="form-label">Fecha de Nacimiento</label>
-        <input type="date" class="form-control" name="fecha_nacimiento" value="<%= personal.fecha_nacimiento ? personal.fecha_nacimiento.toISOString().split('T')[0] : '' %>" />
+        <label class="form-label">Fecha de Nacimiento <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" name="fecha_nacimiento" required value="<%= personal.fecha_nacimiento ? personal.fecha_nacimiento.toISOString().split('T')[0] : '' %>" />
+        <small class="form-text text-muted">Debe ser mayor de 18 años</small>
       </div>
       <div class="col-md-6">
-        <label class="form-label">Fecha de Contratación</label>
-        <input type="date" class="form-control" name="fecha_contratacion" value="<%= personal.fecha_contratacion ? personal.fecha_contratacion.toISOString().split('T')[0] : '' %>" />
+        <label class="form-label">Fecha de Contratación <span class="text-danger">*</span></label>
+        <input type="date" class="form-control" name="fecha_contratacion" required value="<%= personal.fecha_contratacion ? personal.fecha_contratacion.toISOString().split('T')[0] : '' %>" />
       </div>
     </div>
 
