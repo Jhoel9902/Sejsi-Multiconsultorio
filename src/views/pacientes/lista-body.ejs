@@ -91,6 +91,57 @@
             <% } %>
           </div>
         <% } %>
+
+        <!-- Paginación -->
+        <% if (pacientes && pacientes.length > 0 && totalPaginas > 1) { %>
+          <nav aria-label="Paginación de pacientes" class="mt-4">
+            <ul class="pagination justify-content-center">
+              <!-- Página anterior -->
+              <li class="page-item <%= paginaActual === 1 ? 'disabled' : '' %>">
+                <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= paginaActual - 1 %>">Anterior</a>
+              </li>
+
+              <!-- Números de página -->
+              <% 
+                const mostrarDesde = Math.max(1, paginaActual - 2);
+                const mostrarHasta = Math.min(totalPaginas, paginaActual + 2);
+                
+                if (mostrarDesde > 1) { %>
+                  <li class="page-item">
+                    <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=1">1</a>
+                  </li>
+                  <% if (mostrarDesde > 2) { %>
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                  <% } %>
+              <% } %>
+
+              <% for (let i = mostrarDesde; i <= mostrarHasta; i++) { %>
+                <li class="page-item <%= i === paginaActual ? 'active' : '' %>">
+                  <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= i %>"><%= i %></a>
+                </li>
+              <% } %>
+
+              <% if (mostrarHasta < totalPaginas) { %>
+                <% if (mostrarHasta < totalPaginas - 1) { %>
+                  <li class="page-item disabled"><span class="page-link">...</span></li>
+                <% } %>
+                <li class="page-item">
+                  <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= totalPaginas %>"><%= totalPaginas %></a>
+                </li>
+              <% } %>
+
+              <!-- Página siguiente -->
+              <li class="page-item <%= paginaActual === totalPaginas ? 'disabled' : '' %>">
+                <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= paginaActual + 1 %>">Siguiente</a>
+              </li>
+            </ul>
+          </nav>
+          
+          <!-- Info de paginación -->
+          <div class="text-center text-muted small mt-2">
+            Mostrando <strong><%= (paginaActual - 1) * 20 + 1 %></strong> a <strong><%= Math.min(paginaActual * 20, totalPacientes) %></strong> de <strong><%= totalPacientes %></strong> pacientes
+          </div>
+        <% } %>
       </div>
     </div>
   </div>

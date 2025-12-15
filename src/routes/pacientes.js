@@ -8,9 +8,28 @@ const router = Router();
 router.get('/pacientes', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   try {
     const filtro = req.query.filtro || (req.user.nombre_rol === 'admin' ? 'todos' : 'activos');
+    const pagina = parseInt(req.query.pagina) || 1;
+    const porPagina = 20;
+    
     const [pacientes] = await pool.query('CALL sp_pac_listar(?)', [filtro]);
     const lista = Array.isArray(pacientes) ? pacientes[0] : pacientes;
-    res.render('pacientes/lista', { user: req.user, pacientes: lista, filtroActual: filtro });
+    
+    // Calcular paginación
+    const totalPacientes = lista.length;
+    const totalPaginas = Math.ceil(totalPacientes / porPagina);
+    const paginaActual = Math.max(1, Math.min(pagina, totalPaginas));
+    const inicio = (paginaActual - 1) * porPagina;
+    const fin = inicio + porPagina;
+    const pacientesPaginados = lista.slice(inicio, fin);
+    
+    res.render('pacientes/lista', { 
+      user: req.user, 
+      pacientes: pacientesPaginados, 
+      filtroActual: filtro,
+      paginaActual,
+      totalPaginas,
+      totalPacientes
+    });
   } catch (err) {
     res.status(500).send('Error al cargar pacientes.');
   }
