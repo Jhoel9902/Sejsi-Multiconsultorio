@@ -1,0 +1,154 @@
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">📅 Reprogramar Cita</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Alertas -->
+                    <div id="alertas"></div>
+
+                    <!-- Datos actuales -->
+                    <div class="alert alert-info">
+                        <h5>Cita Actual</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Paciente:</strong> <%= cita.nombre_paciente %></p>
+                                <p><strong>Médico:</strong> <%= cita.nombre_medico %></p>
+                                <p><strong>Servicio:</strong> <%= cita.nombre_servicio %></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Fecha/Hora Actual:</strong> <%= cita.fecha_formato %> a las <%= cita.hora_formato %></p>
+                                <p><strong>Reprogramaciones:</strong> <%= cita.nro_reprogramaciones %></p>
+                                <p><strong>Estado:</strong> <span class="badge bg-success">Confirmada</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formulario -->
+                    <form id="formReprogramar">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="fecha_nueva" class="form-label fw-bold">Nueva Fecha *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="fecha_nueva" 
+                                       name="fecha_nueva"
+                                       placeholder="DD/MM/YYYY"
+                                       required>
+                                <small class="text-muted">Formato: DD/MM/YYYY</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="hora_nueva" class="form-label fw-bold">Nueva Hora *</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="hora_nueva" 
+                                       name="hora_nueva"
+                                       placeholder="HH:MM"
+                                       required>
+                                <small class="text-muted">Formato: HH:MM (24h)</small>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/citas/agenda" class="btn btn-outline-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle me-2"></i>Confirmar Reprogramación
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Card información -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">ℹ️ Información</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Motivo Consulta:</strong></p>
+                    <p class="border p-2 bg-light"><%= cita.motivo_consulta || 'N/A' %></p>
+                    <p class="mt-3"><strong>Observaciones:</strong></p>
+                    <p class="border p-2 bg-light"><%= cita.observaciones || 'N/A' %></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Validar fecha en formato DD/MM/YYYY
+    document.getElementById('fecha_nueva').addEventListener('blur', function() {
+        const valor = this.value.trim();
+        if (valor !== '') {
+            const regex = /^\d{2}\/\d{2}\/\d{4}$/;
+            if (!regex.test(valor)) {
+                mostrarAlerta('Formato de fecha inválido. Use DD/MM/YYYY', 'warning');
+            }
+        }
+    });
+
+    // Validar hora en formato HH:MM
+    document.getElementById('hora_nueva').addEventListener('blur', function() {
+        const valor = this.value.trim();
+        if (valor !== '') {
+            const regex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!regex.test(valor)) {
+                mostrarAlerta('Hora debe ser en formato HH:MM (24h)', 'warning');
+            }
+        }
+    });
+
+    // Submit del formulario
+    document.getElementById('formReprogramar').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const fecha_nueva = document.getElementById('fecha_nueva').value.trim();
+        const hora_nueva = document.getElementById('hora_nueva').value.trim();
+
+        if (!fecha_nueva || !hora_nueva) {
+            mostrarAlerta('Por favor completa todos los campos', 'danger');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/citas/<%= cita.id_cita %>/reprogramar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    fecha_nueva,
+                    hora_nueva
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            mostrarAlerta('✅ ' + data.mensaje, 'success');
+            
+            setTimeout(() => {
+                window.location.href = '/citas/agenda';
+            }, 1500);
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al reprogramar cita', 'danger');
+        }
+    });
+
+    function mostrarAlerta(mensaje, tipo = 'danger') {
+        const alertasDiv = document.getElementById('alertas');
+        alertasDiv.innerHTML = `
+            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+</script>

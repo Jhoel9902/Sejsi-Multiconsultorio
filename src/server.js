@@ -12,6 +12,8 @@ import horariosRouter from './routes/horarios.js';
 import historialRouter from './routes/historial.js';
 import serviciosRouter from './routes/servicios.js';
 import recetasRouter from './routes/recetas.js';
+import citasRouter from './routes/citas.js';
+import pagosRouter from './routes/pagos.js';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -69,6 +71,8 @@ app.use(horariosRouter);
 app.use('/historial', historialRouter);
 app.use('/historial', recetasRouter);  // Routes in recetas.js start with / (without /historial)
 app.use(serviciosRouter);
+app.use(citasRouter);
+app.use(pagosRouter);
 
 // 404 - Página no encontrada
 app.use((req, res) => {

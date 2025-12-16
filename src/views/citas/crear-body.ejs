@@ -1,0 +1,235 @@
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-lg">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-calendar-plus me-2"></i>Agendar Nueva Cita</h5>
+            </div>
+            <div class="card-body">
+                <form id="formCrearCita">
+                    <div class="row">
+                        <!-- Seleccionar Paciente -->
+                        <div class="col-md-6 mb-3">
+                            <label for="id_paciente" class="form-label">Paciente *</label>
+                            <select class="form-select" id="id_paciente" name="id_paciente" required>
+                                <option value="">-- Seleccionar Paciente --</option>
+                                <% pacientes.forEach(p => { %>
+                                    <option value="<%= p.id_paciente %>"><%= p.nombre_paciente %> (<%= p.codigo_paciente %>)</option>
+                                <% }); %>
+                            </select>
+                            <small class="text-muted">Selecciona el paciente para agendar la cita</small>
+                        </div>
+
+                        <!-- Seleccionar Médico -->
+                        <div class="col-md-6 mb-3">
+                            <label for="id_personal" class="form-label">Médico *</label>
+                            <select class="form-select" id="id_personal" name="id_personal" required>
+                                <option value="">-- Seleccionar Médico --</option>
+                                <% medicos.forEach(m => { %>
+                                    <option value="<%= m.id_personal %>"><%= m.nombre_medico %></option>
+                                <% }); %>
+                            </select>
+                            <small class="text-muted">Selecciona el médico que atenderá la cita</small>
+                        </div>
+
+                        <!-- Seleccionar Servicio -->
+                        <div class="col-md-6 mb-3">
+                            <label for="id_servicio" class="form-label">Servicio *</label>
+                            <select class="form-select" id="id_servicio" name="id_servicio" required>
+                                <option value="">-- Seleccionar Servicio --</option>
+                                <% servicios.forEach(s => { %>
+                                    <option value="<%= s.id_servicio %>"><%= s.nombre %> (Bs. <%= s.precio %>)</option>
+                                <% }); %>
+                            </select>
+                            <small class="text-muted">Selecciona el tipo de servicio</small>
+                        </div>
+
+                        <!-- Fecha de Cita -->
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha_cita" class="form-label">Fecha de Cita *</label>
+                            <input type="text" class="form-control" id="fecha_cita" name="fecha_cita" placeholder="DD/MM/YYYY" required>
+                            <small class="text-muted">Formato: DD/MM/YYYY (ej: 25/12/2025)</small>
+                        </div>
+
+                        <!-- Hora de Cita -->
+                        <div class="col-md-6 mb-3">
+                            <label for="hora_cita" class="form-label">Hora de Cita *</label>
+                            <input type="text" class="form-control" id="hora_cita" name="hora_cita" placeholder="HH:MM" required>
+                            <small class="text-muted">Formato: HH:MM (ej: 14:30)</small>
+                        </div>
+
+                        <!-- Motivo de Consulta -->
+                        <div class="col-md-12 mb-3">
+                            <label for="motivo_consulta" class="form-label">Motivo de Consulta</label>
+                            <textarea class="form-control" id="motivo_consulta" name="motivo_consulta" rows="2" placeholder="Describe brevemente el motivo de la consulta"></textarea>
+                            <small class="text-muted">Opcional: información sobre el motivo de la consulta</small>
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div class="col-md-12 mb-3">
+                            <label for="observaciones" class="form-label">Observaciones</label>
+                            <textarea class="form-control" id="observaciones" name="observaciones" rows="2" placeholder="Agrega cualquier observación adicional"></textarea>
+                            <small class="text-muted">Opcional: notas adicionales</small>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="col-md-12 mb-3">
+                            <button type="submit" class="btn btn-danger btn-sm w-100">
+                                <i class="bi bi-check-circle me-2"></i>Agendar Cita
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Alertas -->
+                <div id="alertContainer"></div>
+
+                <!-- Modal de Alternativas de Horarios -->
+                <div class="modal fade" id="modalAlternativas" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title">Horarios Alternativos Disponibles</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="text-muted">El horario seleccionado no está disponible. Aquí hay alternativas:</p>
+                                <div id="listaAlternativas"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    // Validar formato de fecha (DD/MM/YYYY)
+                    document.getElementById('fecha_cita').addEventListener('blur', function() {
+                        const regex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[012])\/\d{4}$/;
+                        if (this.value && !regex.test(this.value)) {
+                            mostrarAlerta('Formato de fecha inválido. Use DD/MM/YYYY', 'warning');
+                        }
+                    });
+
+                    // Validar formato de hora (HH:MM)
+                    document.getElementById('hora_cita').addEventListener('blur', function() {
+                        const regex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+                        if (this.value && !regex.test(this.value)) {
+                            mostrarAlerta('Hora debe ser numérica en HH:MM (00:00 a 23:59)', 'warning');
+                        }
+                    });
+
+                    // Manejar envío del formulario
+                    document.getElementById('formCrearCita').addEventListener('submit', async (e) => {
+                        e.preventDefault();
+
+                        const id_paciente = document.getElementById('id_paciente').value.trim();
+                        const id_personal = document.getElementById('id_personal').value.trim();
+                        const id_servicio = document.getElementById('id_servicio').value.trim();
+                        const fecha_cita = document.getElementById('fecha_cita').value.trim();
+                        const hora_cita = document.getElementById('hora_cita').value.trim();
+                        const motivo_consulta = document.getElementById('motivo_consulta').value.trim();
+                        const observaciones = document.getElementById('observaciones').value.trim();
+
+                        // Validaciones básicas
+                        if (!id_paciente || !id_personal || !id_servicio || !fecha_cita || !hora_cita) {
+                            mostrarAlerta('Todos los campos obligatorios deben ser completados', 'danger');
+                            return;
+                        }
+
+                        // Validar formato de fecha
+                        const fechaRegex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[012])\/\d{4}$/;
+                        if (!fechaRegex.test(fecha_cita)) {
+                            mostrarAlerta('Formato de fecha inválido. Use DD/MM/YYYY', 'danger');
+                            return;
+                        }
+
+                        // Validar formato de hora
+                        const horaRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+                        if (!horaRegex.test(hora_cita)) {
+                            mostrarAlerta('Hora debe ser numérica en HH:MM (00:00 a 23:59)', 'danger');
+                            return;
+                        }
+
+                        try {
+                            const response = await fetch('/citas', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    id_paciente,
+                                    id_personal,
+                                    id_servicio,
+                                    fecha_cita,
+                                    hora_cita,
+                                    motivo_consulta: motivo_consulta || null,
+                                    observaciones: observaciones || null
+                                })
+                            });
+
+                            const data = await response.json();
+
+                            if (data.success) {
+                                mostrarAlerta('Cita agendada exitosamente', 'success');
+                                document.getElementById('formCrearCita').reset();
+                                setTimeout(() => {
+                                    window.location.href = '/citas/crear';
+                                }, 2000);
+                            } else {
+                                // Si hay alternativas, mostrar modal
+                                if (data.alternativas && data.alternativas.length > 0) {
+                                    mostrarAlternativas(data.mensaje, data.alternativas);
+                                } else {
+                                    mostrarAlerta(data.mensaje, 'danger');
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error:', error);
+                            mostrarAlerta('Error al agendar cita', 'danger');
+                        }
+                    });
+
+                    function mostrarAlerta(mensaje, tipo) {
+                        const container = document.getElementById('alertContainer');
+                        container.innerHTML = `
+                            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                                ${mensaje}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        `;
+                        window.scrollTo(0, 0);
+                    }
+
+                    function mostrarAlternativas(mensaje, alternativas) {
+                        const listaHTML = alternativas.map(alt => `
+                            <div class="alert alert-info mb-2">
+                                <strong>${alt.opcion_disponible}</strong>
+                                <button class="btn btn-sm btn-primary float-end" onclick="seleccionarAlternativa('${alt.fecha_sugerida}', '${alt.hora_sugerida}')">
+                                    Seleccionar
+                                </button>
+                            </div>
+                        `).join('');
+
+                        document.getElementById('listaAlternativas').innerHTML = listaHTML || '<p class="text-muted">No hay alternativas disponibles</p>';
+                        
+                        mostrarAlerta(mensaje, 'warning');
+                        
+                        const modal = new bootstrap.Modal(document.getElementById('modalAlternativas'));
+                        modal.show();
+                    }
+
+                    function seleccionarAlternativa(fecha, hora) {
+                        // Convertir YYYY-MM-DD a DD/MM/YYYY
+                        const [año, mes, dia] = fecha.split('-');
+                        document.getElementById('fecha_cita').value = `${dia}/${mes}/${año}`;
+                        document.getElementById('hora_cita').value = hora;
+                        
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('modalAlternativas'));
+                        modal.hide();
+                        
+                        mostrarAlerta('Horario alternativo seleccionado. Revisa y vuelve a intentar.', 'info');
+                    }
+                </script>
+            </div>
+        </div>
+    </div>
+</div>

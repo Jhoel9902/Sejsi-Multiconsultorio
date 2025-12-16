@@ -245,6 +245,716 @@ END//
 DELIMITER ;
 
 DELIMITER //
+CREATE PROCEDURE `sp_cita_cancelar`(
+    IN p_id_cita CHAR(36),
+    OUT p_success BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_estado_cita VARCHAR(30);
+    DECLARE v_error_msg VARCHAR(500);
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_mensaje = CONCAT('Error: ', IFNULL(v_error_msg, 'Error al cancelar'));
+    END;
+    
+    SET p_success = FALSE;
+    SET p_mensaje = '';
+    SET v_error_msg = '';
+    
+    -- Obtener estado actual
+    SELECT estado_cita INTO v_estado_cita
+    FROM tcita 
+    WHERE id_cita = p_id_cita AND estado = 1;
+    
+    -- Validar que cita existe
+    IF v_estado_cita IS NULL THEN
+        SET v_error_msg = 'Cita no encontrada';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cita no encontrada';
+    END IF;
+    
+    -- Validar que no esté ya cancelada o completada
+    IF v_estado_cita NOT IN ('confirmada') THEN
+        SET v_error_msg = 'Solo se pueden cancelar citas confirmadas';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Estado inválido';
+    END IF;
+    
+    -- Cancelar: cambiar estado a 0
+    UPDATE tcita
+    SET estado = 0,
+        fecha_actualizacion = CURRENT_TIMESTAMP
+    WHERE id_cita = p_id_cita;
+    
+    SET p_success = TRUE;
+    SET p_mensaje = 'Cita cancelada exitosamente';
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_consultar_agenda`(
+    IN p_id_personal CHAR(36),
+    IN p_fecha_inicio DATE,
+    IN p_fecha_fin DATE,
+    IN p_estado_cita VARCHAR(50)
+)
+BEGIN
+    SELECT 
+        c.id_cita,
+        c.id_paciente,
+        CONCAT(pa.nombre, ' ', pa.apellido_paterno, ' ', COALESCE(pa.apellido_materno, '')) AS nombre_paciente,
+        pa.celular,
+        c.id_personal,
+        CONCAT(pe.nombres, ' ', pe.apellido_paterno) AS nombre_medico,
+        c.fecha_cita,
+        DATE_FORMAT(c.fecha_cita, '%d/%m/%Y') AS fecha_formato,
+        c.hora_cita,
+        TIME_FORMAT(c.hora_cita, '%H:%i') AS hora_formato,
+        CONCAT(DATE_FORMAT(c.fecha_cita, '%d/%m/%Y'), ' ', TIME_FORMAT(c.hora_cita, '%H:%i')) AS fecha_hora_completa,
+        c.id_servicio,
+        s.nombre AS nombre_servicio,
+        c.motivo_consulta,
+        c.observaciones,
+        c.estado_cita,
+        c.nro_reprogramaciones,
+        CASE 
+            WHEN c.estado_cita = 'confirmada' AND c.fecha_cita = CURDATE() THEN 'Hoy'
+            WHEN c.estado_cita = 'confirmada' AND c.fecha_cita > CURDATE() THEN 'Próxima'
+            WHEN c.estado_cita = 'completada' THEN 'Completada'
+            WHEN c.estado_cita = 'cancelada' THEN 'Cancelada'
+            ELSE c.estado_cita
+        END AS estado_mostrar,
+        c.fecha_creacion
+    FROM tcita c
+    INNER JOIN tpaciente pa ON c.id_paciente = pa.id_paciente
+    INNER JOIN tpersonal pe ON c.id_personal = pe.id_personal
+    INNER JOIN tservicio s ON c.id_servicio = s.id_servicio
+    WHERE c.id_personal = p_id_personal
+    AND c.fecha_cita BETWEEN p_fecha_inicio AND p_fecha_fin
+    AND (p_estado_cita = 'todas' OR c.estado_cita = p_estado_cita)
+    AND c.estado = 1
+    ORDER BY c.fecha_cita ASC, c.hora_cita ASC;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_contar_agenda`(
+    IN p_id_personal CHAR(36),
+    IN p_fecha_inicio DATE,
+    IN p_fecha_fin DATE
+)
+BEGIN
+    SELECT 
+        COUNT(*) AS total_citas,
+        SUM(CASE WHEN c.estado_cita = 'confirmada' THEN 1 ELSE 0 END) AS citas_confirmadas,
+        SUM(CASE WHEN c.estado_cita = 'completada' THEN 1 ELSE 0 END) AS citas_completadas,
+        SUM(CASE WHEN c.estado_cita = 'cancelada' THEN 1 ELSE 0 END) AS citas_canceladas,
+        SUM(CASE WHEN c.estado_cita = 'confirmada' AND c.fecha_cita = CURDATE() THEN 1 ELSE 0 END) AS citas_hoy
+    FROM tcita c
+    WHERE c.id_personal = p_id_personal
+    AND c.fecha_cita BETWEEN p_fecha_inicio AND p_fecha_fin
+    AND c.estado = 1;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_crear`(
+    IN p_id_paciente CHAR(36),
+    IN p_id_personal CHAR(36),
+    IN p_id_servicio CHAR(36),
+    IN p_fecha_cita DATE,
+    IN p_hora_cita TIME,
+    IN p_motivo_consulta VARCHAR(200),
+    IN p_observaciones VARCHAR(1000),
+    OUT p_id_cita CHAR(36),
+    OUT p_success BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_dia_semana INT;
+    DECLARE v_horarios_count INT;
+    DECLARE v_existe_cita INT;
+    DECLARE v_hora_inicio TIME;
+    DECLARE v_hora_fin TIME;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_mensaje = CONCAT('Error: ', IFNULL(@error_msg, 'Error desconocido al crear cita'));
+        SET p_id_cita = NULL;
+    END;
+    
+    SET p_success = FALSE;
+    SET p_mensaje = '';
+    SET p_id_cita = NULL;
+    SET @error_msg = '';
+    
+    -- Validar que paciente existe
+    IF NOT EXISTS(SELECT 1 FROM tpaciente WHERE id_paciente = p_id_paciente AND estado = 1) THEN
+        SET @error_msg = 'Paciente no encontrado o inactivo';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Paciente inválido';
+    END IF;
+    
+    -- Validar que médico existe
+    IF NOT EXISTS(SELECT 1 FROM tpersonal WHERE id_personal = p_id_personal AND estado = 1) THEN
+        SET @error_msg = 'Médico no encontrado o inactivo';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Médico inválido';
+    END IF;
+    
+    -- Validar que servicio existe
+    IF NOT EXISTS(SELECT 1 FROM tservicio WHERE id_servicio = p_id_servicio AND estado = 1) THEN
+        SET @error_msg = 'Servicio no encontrado o inactivo';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Servicio inválido';
+    END IF;
+    
+    -- Validar que la fecha no sea anterior a hoy
+    IF p_fecha_cita < CURDATE() THEN
+        SET @error_msg = 'Fecha inválida: No se pueden agendar citas en el pasado';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Fecha en pasado';
+    END IF;
+    
+    -- Obtener día de la semana (1=Lunes, 7=Domingo en nuestro formato)
+    SET v_dia_semana = CASE DAYOFWEEK(p_fecha_cita)
+        WHEN 1 THEN 7
+        WHEN 2 THEN 1
+        WHEN 3 THEN 2
+        WHEN 4 THEN 3
+        WHEN 5 THEN 4
+        WHEN 6 THEN 5
+        WHEN 7 THEN 6
+    END;
+    
+    -- Verificar que el médico tenga horario asignado para ese día
+    -- Y que la hora solicitada esté dentro de alguno de esos horarios
+    IF NOT EXISTS(
+        SELECT 1
+        FROM tpersonal_horario ph
+        JOIN thorario h ON ph.id_horario = h.id_horario
+        WHERE ph.id_personal = p_id_personal 
+        AND h.dia_semana = v_dia_semana
+        AND ph.estado = 1
+        AND h.estado = 1
+        AND p_hora_cita BETWEEN h.hora_inicio AND h.hora_fin
+    ) THEN
+        -- Si no hay horario exacto, obtener todos los horarios del día para mostrar alternativas
+        SELECT GROUP_CONCAT(CONCAT(TIME_FORMAT(h.hora_inicio, '%H:%i'), '-', TIME_FORMAT(h.hora_fin, '%H:%i')) SEPARATOR ', ')
+        INTO @horarios_disponibles
+        FROM tpersonal_horario ph
+        JOIN thorario h ON ph.id_horario = h.id_horario
+        WHERE ph.id_personal = p_id_personal 
+        AND h.dia_semana = v_dia_semana
+        AND ph.estado = 1
+        AND h.estado = 1;
+        
+        IF @horarios_disponibles IS NOT NULL THEN
+            SET @error_msg = CONCAT('La hora no está disponible. Horarios disponibles: ', @horarios_disponibles);
+        ELSE
+            SET @error_msg = 'El médico no tiene horario asignado para este día';
+        END IF;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Hora no disponible';
+    END IF;
+    
+    -- Verificar que no exista otra cita en el mismo horario
+    SELECT COUNT(*) INTO v_existe_cita
+    FROM tcita
+    WHERE id_personal = p_id_personal
+    AND fecha_cita = p_fecha_cita
+    AND hora_cita = p_hora_cita
+    AND estado_cita NOT IN ('cancelada');
+    
+    IF v_existe_cita > 0 THEN
+        SET @error_msg = 'Horario ocupado: El médico ya tiene una cita en este horario';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Horario ocupado';
+    END IF;
+    
+    -- Crear la cita
+    SET p_id_cita = UUID();
+    INSERT INTO tcita (
+        id_cita, id_paciente, id_personal, id_servicio,
+        fecha_cita, hora_cita, motivo_consulta, observaciones,
+        estado_cita, nro_reprogramaciones, estado
+    ) VALUES (
+        p_id_cita, p_id_paciente, p_id_personal, p_id_servicio,
+        p_fecha_cita, p_hora_cita, p_motivo_consulta, p_observaciones,
+        'confirmada', 0, 1
+    );
+    
+    SET p_success = TRUE;
+    SET p_mensaje = 'Cita creada exitosamente';
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_listar_disponibles`(
+    IN p_id_personal CHAR(36),
+    IN p_fecha_inicio DATE,
+    IN p_fecha_fin DATE
+)
+BEGIN
+    SELECT 
+        c.id_cita,
+        c.id_paciente,
+        CONCAT(p.nombre, ' ', p.apellido_paterno, ' ', COALESCE(p.apellido_materno, '')) AS nombre_paciente,
+        c.fecha_cita,
+        c.hora_cita,
+        c.motivo_consulta,
+        s.nombre AS servicio,
+        c.estado_cita
+    FROM tcita c
+    INNER JOIN tpaciente p ON c.id_paciente = p.id_paciente
+    INNER JOIN tservicio s ON c.id_servicio = s.id_servicio
+    WHERE c.id_personal = p_id_personal
+    AND c.fecha_cita BETWEEN p_fecha_inicio AND p_fecha_fin
+    AND c.estado_cita IN ('confirmada', 'completada')
+    AND c.estado = 1
+    ORDER BY c.fecha_cita, c.hora_cita;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_marcar_asistencia`(
+    IN p_id_cita CHAR(36),
+    OUT p_success BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_estado_cita VARCHAR(30);
+    DECLARE v_error_msg VARCHAR(500);
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_mensaje = CONCAT('Error: ', IFNULL(v_error_msg, 'Error al marcar asistencia'));
+    END;
+    
+    SET p_success = FALSE;
+    SET p_mensaje = '';
+    SET v_error_msg = '';
+    
+    -- Obtener estado actual
+    SELECT estado_cita INTO v_estado_cita
+    FROM tcita 
+    WHERE id_cita = p_id_cita AND estado = 1;
+    
+    -- Validar que cita existe
+    IF v_estado_cita IS NULL THEN
+        SET v_error_msg = 'Cita no encontrada';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cita no encontrada';
+    END IF;
+    
+    -- Validar que esté confirmada
+    IF v_estado_cita != 'confirmada' THEN
+        SET v_error_msg = 'Solo se pueden completar citas confirmadas';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Estado inválido';
+    END IF;
+    
+    -- Marcar como completada
+    UPDATE tcita
+    SET estado_cita = 'completada',
+        fecha_actualizacion = CURRENT_TIMESTAMP
+    WHERE id_cita = p_id_cita;
+    
+    SET p_success = TRUE;
+    SET p_mensaje = 'Cita marcada como completada';
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_obtener_detalles`(
+    IN p_id_cita CHAR(36)
+)
+BEGIN
+    SELECT 
+        c.id_cita,
+        c.id_paciente,
+        CONCAT(pa.nombre, ' ', pa.apellido_paterno, ' ', COALESCE(pa.apellido_materno, '')) AS nombre_paciente,
+        pa.celular,
+        pa.correo,
+        c.id_personal,
+        CONCAT(pe.nombres, ' ', pe.apellido_paterno) AS nombre_medico,
+        c.fecha_cita,
+        DATE_FORMAT(c.fecha_cita, '%d/%m/%Y') AS fecha_formato,
+        c.hora_cita,
+        TIME_FORMAT(c.hora_cita, '%H:%i') AS hora_formato,
+        c.id_servicio,
+        s.nombre AS nombre_servicio,
+        c.motivo_consulta,
+        c.observaciones,
+        c.estado_cita,
+        c.nro_reprogramaciones,
+        c.fecha_creacion
+    FROM tcita c
+    INNER JOIN tpaciente pa ON c.id_paciente = pa.id_paciente
+    INNER JOIN tpersonal pe ON c.id_personal = pe.id_personal
+    INNER JOIN tservicio s ON c.id_servicio = s.id_servicio
+    WHERE c.id_cita = p_id_cita
+    AND c.estado = 1;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_obtener_para_marcar_asistencia`(
+    IN p_id_cita CHAR(36)
+)
+BEGIN
+    SELECT 
+        c.id_cita,
+        c.id_paciente,
+        CONCAT(pa.nombre, ' ', pa.apellido_paterno, ' ', COALESCE(pa.apellido_materno, '')) AS nombre_paciente,
+        pa.celular,
+        pa.correo,
+        c.id_personal,
+        CONCAT(pe.nombres, ' ', pe.apellido_paterno) AS nombre_medico,
+        c.fecha_cita,
+        DATE_FORMAT(c.fecha_cita, '%d/%m/%Y') AS fecha_formato,
+        c.hora_cita,
+        TIME_FORMAT(c.hora_cita, '%H:%i') AS hora_formato,
+        c.id_servicio,
+        s.nombre AS nombre_servicio,
+        s.precio AS precio_servicio,
+        c.motivo_consulta,
+        c.observaciones,
+        c.estado_cita,
+        c.fecha_creacion
+    FROM tcita c
+    INNER JOIN tpaciente pa ON c.id_paciente = pa.id_paciente
+    INNER JOIN tpersonal pe ON c.id_personal = pe.id_personal
+    INNER JOIN tservicio s ON c.id_servicio = s.id_servicio
+    WHERE c.id_cita = p_id_cita
+    AND c.estado = 1;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_reprogramar`(
+    IN p_id_cita CHAR(36),
+    IN p_fecha_nueva DATE,
+    IN p_hora_nueva TIME,
+    OUT p_success BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_id_personal CHAR(36);
+    DECLARE v_id_paciente CHAR(36);
+    DECLARE v_estado_cita VARCHAR(30);
+    DECLARE v_nro_reprogramaciones INT;
+    DECLARE v_dia_semana INT;
+    DECLARE v_existe_cita INT;
+    DECLARE v_horarios_disponibles VARCHAR(500);
+    DECLARE v_error_msg VARCHAR(500);
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_mensaje = CONCAT('Error: ', IFNULL(v_error_msg, 'Error desconocido al reprogramar'));
+    END;
+    
+    SET p_success = FALSE;
+    SET p_mensaje = '';
+    SET v_error_msg = '';
+    
+    -- Obtener datos de la cita actual
+    SELECT id_personal, id_paciente, estado_cita, nro_reprogramaciones
+    INTO v_id_personal, v_id_paciente, v_estado_cita, v_nro_reprogramaciones
+    FROM tcita 
+    WHERE id_cita = p_id_cita AND estado = 1;
+    
+    -- Validar que la cita existe
+    IF v_id_personal IS NULL THEN
+        SET v_error_msg = 'Cita no encontrada';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cita no encontrada';
+    END IF;
+    
+    -- Validar que la cita está en estado confirmada
+    IF v_estado_cita != 'confirmada' THEN
+        SET v_error_msg = 'Solo se pueden reprogramar citas confirmadas';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Estado inválido';
+    END IF;
+    
+    -- Validar que no haya sido reprogramada antes (máximo 1 reprogramación)
+    IF v_nro_reprogramaciones >= 1 THEN
+        SET v_error_msg = 'Esta cita ya fue reprogramada. No se permite más de 1 reprogramación';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Límite de reprogramaciones alcanzado';
+    END IF;
+    
+    -- Validar que la fecha no sea anterior a hoy
+    IF p_fecha_nueva < CURDATE() THEN
+        SET v_error_msg = 'La nueva fecha no puede estar en el pasado';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Fecha en pasado';
+    END IF;
+    
+    -- Obtener día de la semana
+    SET v_dia_semana = CASE DAYOFWEEK(p_fecha_nueva)
+        WHEN 1 THEN 7
+        WHEN 2 THEN 1
+        WHEN 3 THEN 2
+        WHEN 4 THEN 3
+        WHEN 5 THEN 4
+        WHEN 6 THEN 5
+        WHEN 7 THEN 6
+    END;
+    
+    -- Validar horario del médico para la nueva fecha
+    IF NOT EXISTS(
+        SELECT 1
+        FROM tpersonal_horario ph
+        JOIN thorario h ON ph.id_horario = h.id_horario
+        WHERE ph.id_personal = v_id_personal 
+        AND h.dia_semana = v_dia_semana
+        AND ph.estado = 1
+        AND h.estado = 1
+        AND p_hora_nueva BETWEEN h.hora_inicio AND h.hora_fin
+    ) THEN
+        SELECT GROUP_CONCAT(CONCAT(TIME_FORMAT(h.hora_inicio, '%H:%i'), '-', TIME_FORMAT(h.hora_fin, '%H:%i')) SEPARATOR ', ')
+        INTO v_horarios_disponibles
+        FROM tpersonal_horario ph
+        JOIN thorario h ON ph.id_horario = h.id_horario
+        WHERE ph.id_personal = v_id_personal 
+        AND h.dia_semana = v_dia_semana
+        AND ph.estado = 1
+        AND h.estado = 1;
+        
+        IF v_horarios_disponibles IS NOT NULL THEN
+            SET v_error_msg = CONCAT('Hora no disponible. Horarios: ', v_horarios_disponibles);
+        ELSE
+            SET v_error_msg = 'El médico no tiene horario para esa fecha';
+        END IF;
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Hora no disponible';
+    END IF;
+    
+    -- Validar que no exista otra cita en ese horario (excepto la actual)
+    SELECT COUNT(*) INTO v_existe_cita
+    FROM tcita
+    WHERE id_personal = v_id_personal
+    AND fecha_cita = p_fecha_nueva
+    AND hora_cita = p_hora_nueva
+    AND id_cita != p_id_cita
+    AND estado_cita NOT IN ('cancelada');
+    
+    IF v_existe_cita > 0 THEN
+        SET v_error_msg = 'El horario ya está ocupado';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Horario ocupado';
+    END IF;
+    
+    -- Actualizar la cita
+    UPDATE tcita
+    SET fecha_cita = p_fecha_nueva,
+        hora_cita = p_hora_nueva,
+        nro_reprogramaciones = nro_reprogramaciones + 1,
+        fecha_actualizacion = CURRENT_TIMESTAMP
+    WHERE id_cita = p_id_cita;
+    
+    SET p_success = TRUE;
+    SET p_mensaje = 'Cita reprogramada exitosamente';
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_sugerir_alternativas`(
+    IN p_id_personal CHAR(36),
+    IN p_fecha_preferida DATE,
+    IN p_hora_preferida TIME,
+    IN p_dias_rango INT
+)
+BEGIN
+    DECLARE v_contador INT DEFAULT 0;
+    DECLARE v_fecha_actual DATE;
+    DECLARE v_fecha_inicio DATE;
+    DECLARE v_fecha_fin DATE;
+    DECLARE v_dia_semana INT;
+    
+    SET v_fecha_actual = CURDATE();
+    SET v_fecha_inicio = p_fecha_preferida;
+    SET v_fecha_fin = DATE_ADD(p_fecha_preferida, INTERVAL p_dias_rango DAY);
+    
+    -- Si la fecha preferida está en el pasado, comenzar desde hoy
+    IF v_fecha_inicio < v_fecha_actual THEN
+        SET v_fecha_inicio = v_fecha_actual;
+    END IF;
+    
+    -- Generar opciones de horarios disponibles
+    WITH RECURSIVE dates AS (
+        SELECT v_fecha_inicio AS fecha_sugerida
+        UNION ALL
+        SELECT DATE_ADD(fecha_sugerida, INTERVAL 1 DAY)
+        FROM dates
+        WHERE fecha_sugerida < v_fecha_fin
+    )
+    SELECT DISTINCT
+        d.fecha_sugerida,
+        h.hora_inicio AS hora_sugerida,
+        CONCAT(DATE_FORMAT(d.fecha_sugerida, '%d/%m/%Y'), ' - ', TIME_FORMAT(h.hora_inicio, '%H:%i')) AS opcion_disponible
+    FROM dates d
+    CROSS JOIN thorario h
+    INNER JOIN tpersonal_horario ph ON h.id_horario = ph.id_horario
+    WHERE ph.id_personal = p_id_personal
+    AND h.dia_semana = CASE DAYOFWEEK(d.fecha_sugerida)
+        WHEN 1 THEN 7
+        WHEN 2 THEN 1
+        WHEN 3 THEN 2
+        WHEN 4 THEN 3
+        WHEN 5 THEN 4
+        WHEN 6 THEN 5
+        WHEN 7 THEN 6
+    END
+    AND ph.estado = 1
+    AND h.estado = 1
+    AND NOT EXISTS (
+        SELECT 1 FROM tcita c
+        WHERE c.id_personal = p_id_personal
+        AND c.fecha_cita = d.fecha_sugerida
+        AND c.hora_cita = h.hora_inicio
+        AND c.estado_cita NOT IN ('cancelada')
+    )
+    LIMIT 10;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_validar_disponibilidad`(
+    IN p_id_personal CHAR(36),
+    IN p_fecha_cita DATE,
+    IN p_hora_cita TIME,
+    OUT p_disponible BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_existe_cita INT DEFAULT 0;
+    DECLARE v_dia_semana INT;
+    DECLARE v_hora_inicio TIME;
+    DECLARE v_hora_fin TIME;
+    DECLARE v_horario_existe INT DEFAULT 0;
+    
+    SET p_disponible = FALSE;
+    SET p_mensaje = '';
+    
+    -- Validar que la fecha no sea anterior a hoy
+    IF p_fecha_cita < CURDATE() THEN
+        SET p_mensaje = 'Fecha inválida: No se pueden agendar citas en el pasado';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Fecha inválida';
+    END IF;
+    
+    -- Obtener día de la semana (1=Lunes, 7=Domingo)
+    SET v_dia_semana = CASE DAYOFWEEK(p_fecha_cita)
+        WHEN 1 THEN 7
+        WHEN 2 THEN 1
+        WHEN 3 THEN 2
+        WHEN 4 THEN 3
+        WHEN 5 THEN 4
+        WHEN 6 THEN 5
+        WHEN 7 THEN 6
+    END;
+    
+    -- Verificar que el médico tenga horario asignado para ese día
+    SELECT COUNT(*), TIME(MAX(h.hora_inicio)), TIME(MAX(h.hora_fin))
+    INTO v_horario_existe, v_hora_inicio, v_hora_fin
+    FROM tpersonal_horario ph
+    JOIN thorario h ON ph.id_horario = h.id_horario
+    WHERE ph.id_personal = p_id_personal 
+    AND h.dia_semana = v_dia_semana
+    AND ph.estado = 1
+    AND h.estado = 1;
+    
+    IF v_horario_existe = 0 THEN
+        SET p_mensaje = 'El médico no tiene horario asignado para este día';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sin horario disponible';
+    END IF;
+    
+    -- Validar que la hora esté dentro del rango del horario
+    IF p_hora_cita < v_hora_inicio OR p_hora_cita > v_hora_fin THEN
+        SET p_mensaje = CONCAT('La hora debe estar entre ', TIME_FORMAT(v_hora_inicio, '%H:%i'), ' y ', TIME_FORMAT(v_hora_fin, '%H:%i'));
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Hora fuera del rango';
+    END IF;
+    
+    -- Verificar que no exista otra cita en el mismo horario
+    SELECT COUNT(*) INTO v_existe_cita
+    FROM tcita
+    WHERE id_personal = p_id_personal
+    AND fecha_cita = p_fecha_cita
+    AND hora_cita = p_hora_cita
+    AND estado_cita NOT IN ('cancelada');
+    
+    IF v_existe_cita > 0 THEN
+        SET p_mensaje = 'Horario ocupado: El médico ya tiene una cita en este horario';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Horario ocupado';
+    END IF;
+    
+    SET p_disponible = TRUE;
+    SET p_mensaje = 'Horario disponible';
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_cita_validar_horario_medico`(
+    IN p_id_personal CHAR(36),
+    IN p_fecha_cita DATE,
+    IN p_hora_cita TIME,
+    OUT p_valido BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_dia_semana INT;
+    DECLARE v_horarios_count INT;
+    DECLARE v_tiene_dia_descanso INT;
+    DECLARE v_dia_descanso_str VARCHAR(20);
+    
+    SET p_valido = FALSE;
+    SET p_mensaje = '';
+    
+    -- Calcular día de la semana
+    SET v_dia_semana = CASE DAYOFWEEK(p_fecha_cita)
+        WHEN 1 THEN 7
+        WHEN 2 THEN 1
+        WHEN 3 THEN 2
+        WHEN 4 THEN 3
+        WHEN 5 THEN 4
+        WHEN 6 THEN 5
+        WHEN 7 THEN 6
+    END;
+    
+    -- Obtener nombre del día
+    SET v_dia_descanso_str = CASE v_dia_semana
+        WHEN 1 THEN 'Lunes'
+        WHEN 2 THEN 'Martes'
+        WHEN 3 THEN 'Miércoles'
+        WHEN 4 THEN 'Jueves'
+        WHEN 5 THEN 'Viernes'
+        WHEN 6 THEN 'Sábado'
+        WHEN 7 THEN 'Domingo'
+    END;
+    
+    -- Verificar si es día de descanso
+    SELECT COUNT(*) INTO v_tiene_dia_descanso
+    FROM tpersonal_horario
+    WHERE id_personal = p_id_personal
+    AND dia_descanso = v_dia_descanso_str;
+    
+    IF v_tiene_dia_descanso > 0 THEN
+        SET p_mensaje = CONCAT('El médico descansa los ', v_dia_descanso_str);
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Día de descanso';
+    END IF;
+    
+    -- Verificar que tenga horarios asignados para ese día
+    SELECT COUNT(*) INTO v_horarios_count
+    FROM tpersonal_horario ph
+    JOIN thorario h ON ph.id_horario = h.id_horario
+    WHERE ph.id_personal = p_id_personal
+    AND h.dia_semana = v_dia_semana
+    AND ph.estado = 1
+    AND h.estado = 1;
+    
+    IF v_horarios_count = 0 THEN
+        SET p_mensaje = CONCAT('El médico no tiene horario asignado para el ', v_dia_descanso_str);
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Sin horario';
+    END IF;
+    
+    SET p_valido = TRUE;
+    SET p_mensaje = 'Horario válido';
+END//
+DELIMITER ;
+
+DELIMITER //
 CREATE PROCEDURE `sp_desactivar_asignacion`(
   IN p_id_paciente CHAR(36),
   IN p_id_aseguradora CHAR(36)
@@ -1098,6 +1808,26 @@ BEGIN
   WHERE p.estado = 1
   GROUP BY p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.ci, p.celular
   ORDER BY p.nombres, p.apellido_paterno;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_paciente_obtener_aseguradoras`(
+    IN p_id_paciente CHAR(36)
+)
+BEGIN
+    SELECT 
+        pa.id_aseguradora,
+        a.nombre AS nombre_aseguradora,
+        a.porcentaje_cobertura,
+        pa.numero_poliza,
+        pa.estado
+    FROM tpaciente_aseguradora pa
+    INNER JOIN taseguradora a ON pa.id_aseguradora = a.id_aseguradora
+    WHERE pa.id_paciente = p_id_paciente
+    AND pa.estado = 1
+    AND a.estado = 1
+    ORDER BY a.nombre;
 END//
 DELIMITER ;
 
@@ -2133,11 +2863,11 @@ END//
 DELIMITER ;
 
 CREATE TABLE IF NOT EXISTS `taseguradora` (
-  `id_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `nombre` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `correo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `telefono` varchar(15) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `descripcion` text COLLATE utf8mb4_unicode_ci,
+  `id_aseguradora` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `nombre` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `correo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `telefono` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `porcentaje_cobertura` decimal(5,2) NOT NULL DEFAULT '0.00',
   `fecha_inicio` date DEFAULT NULL,
   `fecha_fin` date DEFAULT NULL,
@@ -2163,17 +2893,17 @@ INSERT INTO `taseguradora` (`id_aseguradora`, `nombre`, `correo`, `telefono`, `d
 	('fea61f1c-da25-11f0-81c4-40c2ba62ef61', 'seguros pepitobb', 'adasdmin@gmail.com', '7777777771', NULL, 51.00, '2019-11-30', '2037-02-01', 1, '2025-12-15 22:21:56');
 
 CREATE TABLE IF NOT EXISTS `tcita` (
-  `id_cita` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_servicio` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_cita` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_paciente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_servicio` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fecha_cita` date NOT NULL,
   `hora_cita` time NOT NULL,
-  `motivo_consulta` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Consulta general',
-  `observaciones` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `estado_cita` enum('pendiente','confirmada','en_atencion','completada','cancelada','no_asistio') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pendiente',
+  `motivo_consulta` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Consulta general',
+  `observaciones` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estado_cita` enum('pendiente','confirmada','en_atencion','completada','cancelada','no_asistio') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pendiente',
   `nro_reprogramaciones` tinyint NOT NULL DEFAULT '0',
-  `motivo_cancelacion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `motivo_cancelacion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -2187,20 +2917,27 @@ CREATE TABLE IF NOT EXISTS `tcita` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `tcita` (`id_cita`, `id_paciente`, `id_personal`, `id_servicio`, `fecha_cita`, `hora_cita`, `motivo_consulta`, `observaciones`, `estado_cita`, `nro_reprogramaciones`, `motivo_cancelacion`, `estado`, `fecha_creacion`, `fecha_actualizacion`) VALUES
+	('19468ec7-da50-11f0-81c4-40c2ba62ef61', '77621edc-da3d-11f0-81c4-40c2ba62ef61', 'afd20c43-da2d-11f0-81c4-40c2ba62ef61', '890c557f-da40-11f0-81c4-40c2ba62ef61', '2025-12-22', '10:00:00', 'asd', 'asd', 'confirmada', 0, NULL, 1, '2025-12-16 03:23:20', NULL),
+	('293cea33-da4c-11f0-81c4-40c2ba62ef61', 'ab57fd94-d864-11f0-9531-40c2ba62ef61', '6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-22', '15:00:00', 'asd', NULL, 'confirmada', 0, NULL, 1, '2025-12-16 02:55:09', NULL),
+	('4d2d9c79-da52-11f0-81c4-40c2ba62ef61', 'ab57d017-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440002', '2025-12-23', '11:00:00', 'asd', 'asd', 'completada', 1, NULL, 1, '2025-12-16 03:39:06', '2025-12-16 04:21:54'),
+	('95fab792-da58-11f0-81c4-40c2ba62ef61', 'ab57d017-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '890c4d60-da40-11f0-81c4-40c2ba62ef61', '2025-12-22', '10:00:00', 'asd', 'asd', 'confirmada', 0, NULL, 1, '2025-12-16 04:24:05', NULL),
+	('a5f2970c-da4b-11f0-81c4-40c2ba62ef61', 'ab57d017-d864-11f0-9531-40c2ba62ef61', '6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', '890c4666-da40-11f0-81c4-40c2ba62ef61', '2025-12-22', '10:00:00', 'sad', 'asd', 'confirmada', 0, NULL, 1, '2025-12-16 02:51:29', NULL),
 	('c1b2b7e9-da36-11f0-81c4-40c2ba62ef61', 'ab57c083-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-10', '09:00:00', 'Consulta de control', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
 	('c1b2c191-da36-11f0-81c4-40c2ba62ef61', 'ab57cd83-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-11', '10:30:00', 'Dolor de cabeza', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
-	('c1b2c5a1-da36-11f0-81c4-40c2ba62ef61', 'ab57d017-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440002', '2025-12-16', '14:00:00', 'Revisión cardiaca', NULL, 'confirmada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
+	('c1b2c5a1-da36-11f0-81c4-40c2ba62ef61', 'ab57d017-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440002', '2025-12-17', '15:00:00', 'Revisión cardiaca', NULL, 'confirmada', 1, NULL, 0, '2025-12-16 00:21:56', '2025-12-16 03:34:12'),
 	('c1b2e212-da36-11f0-81c4-40c2ba62ef61', 'ab57d20c-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440003', '2025-12-17', '15:30:00', 'Revisión dermatológica', NULL, 'pendiente', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
 	('c1b2e547-da36-11f0-81c4-40c2ba62ef61', 'ab57d3d9-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-12', '11:00:00', 'Seguimiento', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
 	('c1b2e796-da36-11f0-81c4-40c2ba62ef61', 'ab57d5cc-d864-11f0-9531-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-13', '09:30:00', 'Consulta general', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
 	('c1b2e9ee-da36-11f0-81c4-40c2ba62ef61', 'ab57d5cc-d864-11f0-9531-40c2ba62ef61', '33d3476d-d861-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-14', '16:00:00', 'Consulta especializada', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
-	('c1b2ec04-da36-11f0-81c4-40c2ba62ef61', 'ab57e100-d864-11f0-9531-40c2ba62ef61', '33d3476d-d861-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-15', '13:30:00', 'Seguimiento', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL);
+	('c1b2ec04-da36-11f0-81c4-40c2ba62ef61', 'ab57e100-d864-11f0-9531-40c2ba62ef61', '33d3476d-d861-11f0-9531-40c2ba62ef61', '550e8400-e29b-41d4-a716-446655440001', '2025-12-15', '13:30:00', 'Seguimiento', NULL, 'completada', 0, NULL, 1, '2025-12-16 00:21:56', NULL),
+	('d87973ce-da64-11f0-8b1b-40c2ba62ef61', '7f0a6ea8-da06-11f0-90da-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '890c4d60-da40-11f0-81c4-40c2ba62ef61', '2025-12-22', '09:00:00', 'con aseguradora', 'sad', 'completada', 0, NULL, 1, '2025-12-16 05:51:51', '2025-12-16 05:53:12'),
+	('ed6febf2-da64-11f0-8b1b-40c2ba62ef61', '7f0a6c26-da06-11f0-90da-40c2ba62ef61', '401fc518-d85c-11f0-9531-40c2ba62ef61', '890c4d60-da40-11f0-81c4-40c2ba62ef61', '2025-12-22', '10:30:00', 'sin aseguradora', 'sad', 'completada', 0, NULL, 1, '2025-12-16 05:52:26', '2025-12-16 05:54:04');
 
 CREATE TABLE IF NOT EXISTS `tdetalle_factura_aseguradora` (
-  `id_detalle_aseg` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_factura_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_servicio` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `descripcion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_detalle_aseg` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_factura_aseguradora` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_servicio` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `cantidad` int NOT NULL DEFAULT '1',
   `precio_unitario` decimal(12,2) NOT NULL DEFAULT '0.00',
   `subtotal` decimal(12,2) GENERATED ALWAYS AS ((`cantidad` * `precio_unitario`)) STORED,
@@ -2213,12 +2950,14 @@ CREATE TABLE IF NOT EXISTS `tdetalle_factura_aseguradora` (
   CONSTRAINT `FK_dfa_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tdetalle_factura_aseguradora` (`id_detalle_aseg`, `id_factura_aseguradora`, `id_servicio`, `descripcion`, `cantidad`, `precio_unitario`, `estado`, `fecha_creacion`) VALUES
+	('08e27521-da65-11f0-8b1b-40c2ba62ef61', '08e1cff9-da65-11f0-8b1b-40c2ba62ef61', '890c4d60-da40-11f0-81c4-40c2ba62ef61', NULL, 1, 600.00, 1, '2025-12-16 05:53:12');
 
 CREATE TABLE IF NOT EXISTS `tdetalle_factura_cliente` (
-  `id_detalle_cliente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_factura_cliente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_servicio` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `descripcion` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_detalle_cliente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_factura_cliente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_servicio` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `descripcion` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `cantidad` int NOT NULL DEFAULT '1',
   `precio_unitario` decimal(12,2) NOT NULL DEFAULT '0.00',
   `subtotal` decimal(12,2) GENERATED ALWAYS AS ((`cantidad` * `precio_unitario`)) STORED,
@@ -2231,11 +2970,14 @@ CREATE TABLE IF NOT EXISTS `tdetalle_factura_cliente` (
   CONSTRAINT `FK_dfc_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tdetalle_factura_cliente` (`id_detalle_cliente`, `id_factura_cliente`, `id_servicio`, `descripcion`, `cantidad`, `precio_unitario`, `estado`, `fecha_creacion`) VALUES
+	('08e43adb-da65-11f0-8b1b-40c2ba62ef61', '08e39b85-da65-11f0-8b1b-40c2ba62ef61', '890c4d60-da40-11f0-81c4-40c2ba62ef61', NULL, 1, 180.00, 1, '2025-12-16 05:53:12'),
+	('282f57b6-da65-11f0-8b1b-40c2ba62ef61', '282ee83a-da65-11f0-8b1b-40c2ba62ef61', '890c4d60-da40-11f0-81c4-40c2ba62ef61', NULL, 1, 600.00, 1, '2025-12-16 05:54:04');
 
 CREATE TABLE IF NOT EXISTS `tespecialidad` (
-  `id_especialidad` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `nombre` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `descripcion` text COLLATE utf8mb4_unicode_ci,
+  `id_especialidad` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `nombre` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id_especialidad`),
@@ -2255,11 +2997,11 @@ INSERT INTO `tespecialidad` (`id_especialidad`, `nombre`, `descripcion`, `fecha_
 	('fa528efa-d9e0-11f0-a245-40c2ba62ef61', 'cosmologia', 'no tiene sentido pero no valida hasta este punto', '2025-12-15 14:07:54', 1);
 
 CREATE TABLE IF NOT EXISTS `testudio` (
-  `id_estudio` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_historial` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_personal` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `nombre_estudio` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `foto` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_estudio` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_historial` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `nombre_estudio` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `foto` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fecha_subida` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id_estudio`),
@@ -2278,14 +3020,14 @@ INSERT INTO `testudio` (`id_estudio`, `id_historial`, `id_personal`, `nombre_est
 	('d3e41ed0-da3a-11f0-81c4-40c2ba62ef61', 'cc825520-da3a-11f0-81c4-40c2ba62ef61', 'afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'geneologia ', '/uploads/estudios/estudio-1765860664630-137492.jpg', '2025-12-16 00:51:04', 1);
 
 CREATE TABLE IF NOT EXISTS `tfactura_aseguradora` (
-  `id_factura_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_cita` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `id_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_factura_aseguradora` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_cita` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_aseguradora` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fecha_emision` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `numero_factura` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `numero_factura` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `subtotal` decimal(12,2) NOT NULL DEFAULT '0.00',
   `total_cubierto` decimal(12,2) NOT NULL DEFAULT '0.00',
-  `observaciones` text COLLATE utf8mb4_unicode_ci,
+  `observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_factura_aseguradora`),
@@ -2296,17 +3038,19 @@ CREATE TABLE IF NOT EXISTS `tfactura_aseguradora` (
   CONSTRAINT `FK_fa_cita` FOREIGN KEY (`id_cita`) REFERENCES `tcita` (`id_cita`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tfactura_aseguradora` (`id_factura_aseguradora`, `id_cita`, `id_aseguradora`, `fecha_emision`, `numero_factura`, `subtotal`, `total_cubierto`, `observaciones`, `estado`, `fecha_creacion`) VALUES
+	('08e1cff9-da65-11f0-8b1b-40c2ba62ef61', 'd87973ce-da64-11f0-8b1b-40c2ba62ef61', 'e52b4993-da13-11f0-81c4-40c2ba62ef61', '2025-12-16 05:53:12', 'FAC-AS-2025-00001', 600.00, 420.00, NULL, 1, '2025-12-16 05:53:12');
 
 CREATE TABLE IF NOT EXISTS `tfactura_cliente` (
-  `id_factura_cliente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_cita` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_factura_cliente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_cita` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_paciente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fecha_emision` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `numero_factura` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `numero_factura` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `subtotal` decimal(12,2) NOT NULL DEFAULT '0.00',
   `total` decimal(12,2) NOT NULL DEFAULT '0.00',
-  `metodo_pago` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `observaciones` text COLLATE utf8mb4_unicode_ci,
+  `metodo_pago` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_factura_cliente`),
@@ -2317,16 +3061,19 @@ CREATE TABLE IF NOT EXISTS `tfactura_cliente` (
   CONSTRAINT `FK_fc_paciente` FOREIGN KEY (`id_paciente`) REFERENCES `tpaciente` (`id_paciente`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tfactura_cliente` (`id_factura_cliente`, `id_cita`, `id_paciente`, `fecha_emision`, `numero_factura`, `subtotal`, `total`, `metodo_pago`, `observaciones`, `estado`, `fecha_creacion`) VALUES
+	('08e39b85-da65-11f0-8b1b-40c2ba62ef61', 'd87973ce-da64-11f0-8b1b-40c2ba62ef61', '7f0a6ea8-da06-11f0-90da-40c2ba62ef61', '2025-12-16 05:53:12', 'FAC-CL-2025-00001', 180.00, 180.00, NULL, NULL, 1, '2025-12-16 05:53:12'),
+	('282ee83a-da65-11f0-8b1b-40c2ba62ef61', 'ed6febf2-da64-11f0-8b1b-40c2ba62ef61', '7f0a6c26-da06-11f0-90da-40c2ba62ef61', '2025-12-16 05:54:04', 'FAC-CL-2025-00002', 600.00, 600.00, NULL, NULL, 1, '2025-12-16 05:54:04');
 
 CREATE TABLE IF NOT EXISTS `thistorial_paciente` (
-  `id_historial` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_personal` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_historial` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_paciente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `id_cita` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `diagnosticos` text COLLATE utf8mb4_unicode_ci,
-  `evoluciones` text COLLATE utf8mb4_unicode_ci,
-  `antecedentes` text COLLATE utf8mb4_unicode_ci,
-  `tratamientos` text COLLATE utf8mb4_unicode_ci,
+  `diagnosticos` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `evoluciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `antecedentes` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `tratamientos` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_ultima_actualizacion` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
@@ -2355,11 +3102,11 @@ INSERT INTO `thistorial_paciente` (`id_historial`, `id_paciente`, `id_personal`,
 	('f72b8412-da39-11f0-81c4-40c2ba62ef61', 'ab57d5cc-d864-11f0-9531-40c2ba62ef61', 'afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'c1b2e796-da36-11f0-81c4-40c2ba62ef61', 'segunda', 'asdas', 'asdas', '', '2025-12-16 00:44:54', NULL, 1);
 
 CREATE TABLE IF NOT EXISTS `thorario` (
-  `id_horario` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_horario` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
   `dia_semana` tinyint NOT NULL,
   `hora_inicio` time NOT NULL,
   `hora_fin` time NOT NULL,
-  `descripcion` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `descripcion` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_horario`),
@@ -2388,23 +3135,23 @@ INSERT INTO `thorario` (`id_horario`, `dia_semana`, `hora_inicio`, `hora_fin`, `
 	('dd9d34db-da1f-11f0-81c4-40c2ba62ef61', 7, '13:00:00', '17:00:00', 'Tarde Domingo', 1, '2025-12-15 21:38:04');
 
 CREATE TABLE IF NOT EXISTS `tpaciente` (
-  `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `nombre` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `apellido_paterno` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `apellido_materno` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_paciente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `nombre` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `apellido_paterno` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `apellido_materno` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fecha_nacimiento` date DEFAULT NULL,
-  `ci` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `estado_civil` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `domicilio` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `nacionalidad` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `tipo_sangre` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `alergias` text COLLATE utf8mb4_unicode_ci,
-  `contacto_emerg` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `enfermedad_base` text COLLATE utf8mb4_unicode_ci,
-  `observaciones` text COLLATE utf8mb4_unicode_ci,
-  `celular` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `correo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `codigo_paciente` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ci` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estado_civil` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `domicilio` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `nacionalidad` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `tipo_sangre` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `alergias` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `contacto_emerg` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `enfermedad_base` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `observaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `celular` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `correo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `codigo_paciente` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -2476,9 +3223,9 @@ INSERT INTO `tpaciente` (`id_paciente`, `nombre`, `apellido_paterno`, `apellido_
 	('bdbbead8-da3d-11f0-81c4-40c2ba62ef61', 'crear paciente reg', 'asdasd', NULL, '2020-12-29', '7894543', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '7418529636', NULL, 'PAC-20251216-06984', 1, '2025-12-16 01:11:55', NULL);
 
 CREATE TABLE IF NOT EXISTS `tpaciente_aseguradora` (
-  `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_aseguradora` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `numero_poliza` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_paciente` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_aseguradora` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `numero_poliza` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fecha_asignacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_fin` date DEFAULT NULL,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
@@ -2489,25 +3236,28 @@ CREATE TABLE IF NOT EXISTS `tpaciente_aseguradora` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `tpaciente_aseguradora` (`id_paciente`, `id_aseguradora`, `numero_poliza`, `fecha_asignacion`, `fecha_fin`, `estado`) VALUES
-	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b5710-da13-11f0-81c4-40c2ba62ef61', 'POL-2025-454', '2025-12-15 20:44:35', NULL, 0),
-	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b5c6c-da13-11f0-81c4-40c2ba62ef61', 'POL-2025-54564', '2025-12-15 20:44:03', NULL, 1);
+	('7f0a67f9-da06-11f0-90da-40c2ba62ef61', 'e52b5fed-da13-11f0-81c4-40c2ba62ef61', 'asdasd', '2025-12-16 04:01:29', NULL, 1),
+	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b4993-da13-11f0-81c4-40c2ba62ef61', 'asdasd', '2025-12-16 04:01:41', NULL, 1),
+	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b5710-da13-11f0-81c4-40c2ba62ef61', 'POL-84984as-45', '2025-12-15 20:44:35', NULL, 1),
+	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b5c6c-da13-11f0-81c4-40c2ba62ef61', 'POL-2025-54564', '2025-12-15 20:44:03', NULL, 1),
+	('ab57d017-d864-11f0-9531-40c2ba62ef61', '314a7e50-da16-11f0-81c4-40c2ba62ef61', 'asdasd', '2025-12-16 04:20:53', NULL, 1);
 
 CREATE TABLE IF NOT EXISTS `tpersonal` (
-  `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `ci` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `nombres` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `apellido_paterno` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `apellido_materno` varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `cargo` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `id_rol` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `ci` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `nombres` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `apellido_paterno` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `apellido_materno` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cargo` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_rol` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fecha_nacimiento` date DEFAULT NULL,
   `fecha_contratacion` date DEFAULT NULL,
-  `domicilio` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `celular` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `correo` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `contrasena` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `foto_perfil` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `archivo_contrato` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `domicilio` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `celular` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `correo` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `contrasena` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `foto_perfil` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `archivo_contrato` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `fecha_actualizacion` datetime DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
@@ -2529,12 +3279,13 @@ INSERT INTO `tpersonal` (`id_personal`, `ci`, `nombres`, `apellido_paterno`, `ap
 	('8c338e27-d9e2-11f0-a245-40c2ba62ef61', '7567443', 'asdqwe', 'qqqqq', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', NULL, NULL, NULL, NULL, 'ooop@sdasd.com', '$2a$10$nQay.m929V6aRm54RyRgkO1S4y4FCG5Kys57lEiufRgQOt8C1lUvC', NULL, NULL, 1, '2025-12-15 14:19:08', NULL),
 	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', '77765', 'asda', 'asda', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', NULL, NULL, NULL, NULL, 'a22@gmai.com', '$2a$10$wVNHxIc5a/KsHA8Fbv/iAurqy1i/hZo7ct4FbEC1mXKwqu0MyZ6uq', NULL, NULL, 1, '2025-12-15 14:12:08', NULL),
 	('95c8ca08-d9e3-11f0-a245-40c2ba62ef61', '88485', '', '', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', NULL, '2025-01-01', NULL, NULL, NULL, '$2a$10$A2sh9Vw0Q8Z13CX/nLHlX.OOfj4WdFjJ.ZHP2RiuWJlbXo8b/11l.', NULL, NULL, 1, '2025-12-15 14:26:34', NULL),
+	('9c19fbc6-da48-11f0-81c4-40c2ba62ef61', '5551118', 'asda', 'asdas', NULL, '', '0fe2393a-d854-11f0-9531-40c2ba62ef61', '1991-12-31', '2022-01-31', NULL, '1234123412', NULL, '$2a$10$ft9rGXjrGcwAueWDlOYl7ealkP4bEzWY9mlMGOD8rHZEA8iZD5p9O', '/uploads/personal/fotos/foto-1765866583874-773089016.jpg', NULL, 1, '2025-12-16 02:29:43', NULL),
 	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', '9873215', 'medicoa', 'kamaro', NULL, '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2006-12-31', '2024-12-31', NULL, '7418529630', 'medico@gmail.com', '$2a$10$0LfsRRnBatJ8vYZydl5ImeLFLJ1L8t878vLXS9vCFQTh8a7uRlT9m', NULL, NULL, 1, '2025-12-15 23:17:00', NULL),
 	('ee955eac-d9e3-11f0-a245-40c2ba62ef61', '1312', '12312122', '154adsa', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2011-02-02', '2020-11-30', NULL, NULL, NULL, '$2a$10$KmFfoKr2kUbFprgpxNdwu.jCW07hPHOa.2HK/vm1oyPbu8DvUzrcC', NULL, NULL, 1, '2025-12-15 14:29:03', NULL);
 
 CREATE TABLE IF NOT EXISTS `tpersonal_especialidad` (
-  `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_especialidad` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_especialidad` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `fecha_asignacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id_personal`,`id_especialidad`),
@@ -2564,7 +3315,7 @@ INSERT INTO `tpersonal_especialidad` (`id_personal`, `id_especialidad`, `fecha_a
 CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
   `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `id_horario` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `dia_descanso` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dia_descanso` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `fecha_asignacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id_personal`,`id_horario`),
@@ -2574,22 +3325,37 @@ CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `tpersonal_horario` (`id_personal`, `id_horario`, `dia_descanso`, `fecha_asignacion`, `estado`) VALUES
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9cac24-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:12:13', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9cb334-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:12:19', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9cb594-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:12:26', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9cb65c-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:12:32', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9d2c63-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:14:55', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9d2d15-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:15:01', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9d2f3c-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:15:10', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9d2fca-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:15:17', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9d30df-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:15:23', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'dd9d3164-da1f-11f0-81c4-40c2ba62ef61', 'Domingo', '2025-12-16 03:15:31', 1),
 	('69a37493-d87f-11f0-81b0-40c2ba62ef61', 'dd9d2c63-da1f-11f0-81c4-40c2ba62ef61', 'Lunes', '2025-12-15 22:41:27', 1),
 	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', 'dd9cac24-da1f-11f0-81c4-40c2ba62ef61', 'Viernes', '2025-12-15 22:04:43', 1),
 	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', 'dd9cb334-da1f-11f0-81c4-40c2ba62ef61', 'Viernes', '2025-12-15 22:05:10', 1),
 	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', 'dd9cb594-da1f-11f0-81c4-40c2ba62ef61', 'Viernes', '2025-12-15 22:08:28', 1),
-	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', 'dd9d2c63-da1f-11f0-81c4-40c2ba62ef61', 'Viernes', '2025-12-15 22:08:05', 1);
+	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', 'dd9d2c63-da1f-11f0-81c4-40c2ba62ef61', 'Viernes', '2025-12-15 22:08:05', 1),
+	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'dd9cac24-da1f-11f0-81c4-40c2ba62ef61', 'Sábado', '2025-12-16 03:21:49', 1),
+	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'dd9cb594-da1f-11f0-81c4-40c2ba62ef61', 'Sábado', '2025-12-16 03:21:40', 1),
+	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'dd9d2c63-da1f-11f0-81c4-40c2ba62ef61', 'Sábado', '2025-12-16 03:21:57', 1),
+	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'dd9d2f3c-da1f-11f0-81c4-40c2ba62ef61', 'Sábado', '2025-12-16 03:22:02', 1),
+	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'dd9d30df-da1f-11f0-81c4-40c2ba62ef61', 'Sábado', '2025-12-16 03:22:08', 1);
 
 CREATE TABLE IF NOT EXISTS `treceta` (
-  `id_receta` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `id_historial` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `id_personal` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `medicamento_nombre` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `presentacion` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `dosis` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `frecuencia` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `duracion` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `indicaciones` text COLLATE utf8mb4_unicode_ci,
+  `id_receta` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `id_historial` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `medicamento_nombre` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `presentacion` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dosis` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `frecuencia` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `duracion` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `indicaciones` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `fecha_emision` date NOT NULL DEFAULT (curdate()),
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2600,11 +3366,13 @@ CREATE TABLE IF NOT EXISTS `treceta` (
   CONSTRAINT `FK_receta_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `treceta` (`id_receta`, `id_historial`, `id_personal`, `medicamento_nombre`, `presentacion`, `dosis`, `frecuencia`, `duracion`, `indicaciones`, `fecha_emision`, `estado`, `fecha_creacion`) VALUES
+	('b247a51a-da45-11f0-81c4-40c2ba62ef61', '4564b639-da3e-11f0-81c4-40c2ba62ef61', 'afd20c43-da2d-11f0-81c4-40c2ba62ef61', 'mitrozon', 'jarabe', '550mg', 'diario', '5 dias', 'asd', '2025-12-16', 1, '2025-12-16 02:08:52');
 
 CREATE TABLE IF NOT EXISTS `trol` (
-  `id_rol` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `nombre_rol` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `descripcion` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `id_rol` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `nombre_rol` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descripcion` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id_rol`),
@@ -2617,10 +3385,10 @@ INSERT INTO `trol` (`id_rol`, `nombre_rol`, `descripcion`, `estado`, `fecha_crea
 	('0fe23b2d-d854-11f0-9531-40c2ba62ef61', 'medico', 'Gestión clínica', 1, '2025-12-13 14:50:27');
 
 CREATE TABLE IF NOT EXISTS `tservicio` (
-  `id_servicio` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
-  `nombre` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_servicio` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
+  `nombre` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `precio` decimal(10,2) NOT NULL DEFAULT '0.00',
-  `descripcion` text COLLATE utf8mb4_unicode_ci,
+  `descripcion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `fecha_creacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id_servicio`),

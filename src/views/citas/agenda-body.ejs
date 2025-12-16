@@ -1,0 +1,589 @@
+<div class="container-fluid mt-4">
+    <style>
+        .stats-card {
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 0.75rem;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.2s ease;
+        }
+
+        .stats-card:hover {
+            border-color: #dee2e6;
+            background-color: #fff;
+        }
+
+        .stats-card .card-title {
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .stats-card .card-text {
+            font-size: 1.5rem;
+            margin: 0;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .btn-action {
+            padding: 0.375rem 0.5rem;
+            font-size: 0.75rem;
+            border: 1px solid #dee2e6;
+            background-color: #f8f9fa;
+            color: #666;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .btn-action:hover {
+            background-color: #e9ecef;
+            color: #333;
+            border-color: #adb5bd;
+            text-decoration: none;
+        }
+
+        .btn-action.ver {
+            color: #0d6efd;
+        }
+
+        .btn-action.ver:hover {
+            background-color: #e7f1ff;
+            border-color: #0d6efd;
+        }
+
+        .btn-action.reprogram {
+            color: #ff9800;
+        }
+
+        .btn-action.reprogram:hover {
+            background-color: #fff3e0;
+            border-color: #ff9800;
+        }
+
+        .btn-action.asistencia {
+            color: #198754;
+        }
+
+        .btn-action.asistencia:hover {
+            background-color: #e8f5e9;
+            border-color: #198754;
+        }
+
+        .btn-action.cancelar {
+            color: #dc3545;
+        }
+
+        .btn-action.cancelar:hover {
+            background-color: #ffe5e5;
+            border-color: #dc3545;
+        }
+
+        .btn-group-container {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        #tabla-citas {
+            font-size: 0.9rem;
+        }
+
+        #tabla-citas td {
+            vertical-align: middle;
+            padding: 0.4rem 0.5rem;
+        }
+
+        #tabla-citas th {
+            padding: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            #tabla-citas {
+                font-size: 0.8rem;
+            }
+            
+            .btn-action {
+                padding: 0.3rem 0.4rem;
+                font-size: 0.7rem;
+            }
+        }
+    </style>
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2 class="mb-4">📋 Agenda de Citas</h2>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-3">
+        <% if (user.nombre_rol === 'ventanilla') { %>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Médico</label>
+            <select class="form-select" id="id_personal">
+                <option value="">Seleccionar médico...</option>
+                <% medicos.forEach(medico => { %>
+                    <option value="<%= medico.id_personal %>"><%= medico.nombre_medico %></option>
+                <% }); %>
+            </select>
+        </div>
+        <% } else { %>
+        <!-- Médico solo ve sus propias citas -->
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Mi Agenda</label>
+            <input type="text" class="form-control" value="<%= medicos[0]?.nombre_medico || user.nombres %>" disabled />
+        </div>
+        <% } %>
+        <div class="col-md-2">
+            <label class="form-label fw-bold">Desde</label>
+            <input type="date" class="form-control" id="fecha_inicio" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-bold">Hasta</label>
+            <input type="date" class="form-control" id="fecha_fin" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-bold">Estado</label>
+            <select class="form-select" id="estado">
+                <option value="todas">Todas</option>
+                <option value="confirmada">Confirmadas</option>
+                <option value="completada">Completadas</option>
+                <option value="cancelada">Canceladas</option>
+            </select>
+        </div>
+        <div class="col-md-3 d-flex align-items-end gap-2">
+            <button class="btn btn-primary" onclick="filtrarCitas()">🔍 Buscar</button>
+            <button class="btn btn-outline-secondary" onclick="presetSemana()">Esta Semana</button>
+            <button class="btn btn-outline-secondary" onclick="presetMes()">Este Mes</button>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    <div id="alertas"></div>
+
+    <!-- Conteos rápidos -->
+    <div class="row mb-3" id="conteos-container" style="display: none;">
+        <div class="col-6 col-sm-4 col-md-2 mb-2">
+            <div class="stats-card">
+                <h6 class="card-title">Total</h6>
+                <p class="card-text" id="total-citas">0</p>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2 mb-2">
+            <div class="stats-card">
+                <h6 class="card-title" style="color: #198754;">Confirmadas</h6>
+                <p class="card-text" id="citas-confirmadas" style="color: #198754;">0</p>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2 mb-2">
+            <div class="stats-card">
+                <h6 class="card-title" style="color: #0dcaf0;">Completadas</h6>
+                <p class="card-text" id="citas-completadas" style="color: #0dcaf0;">0</p>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2 mb-2">
+            <div class="stats-card">
+                <h6 class="card-title" style="color: #dc3545;">Canceladas</h6>
+                <p class="card-text" id="citas-canceladas" style="color: #dc3545;">0</p>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-md-2 mb-2">
+            <div class="stats-card">
+                <h6 class="card-title" style="color: #fd7e14;">Hoy</h6>
+                <p class="card-text" id="citas-hoy" style="color: #fd7e14;">0</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de citas -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm" id="tabla-citas">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 12%;">Fecha</th>
+                            <th style="width: 8%;">Hora</th>
+                            <th style="width: 22%;">Paciente</th>
+                            <th style="width: 12%;">Teléfono</th>
+                            <th style="width: 18%;">Servicio</th>
+                            <th style="width: 10%;">Estado</th>
+                            <th style="width: 8%;">Reprog</th>
+                            <th style="width: 10%;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="citas-tbody">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">Selecciona filtros y haz clic en "Buscar"</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalles -->
+<div class="modal fade" id="modalDetalles" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalles de la Cita</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detalles-content">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Marcar Asistencia -->
+<div class="modal fade" id="modalAsistencia" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Marcar Asistencia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="asistencia-content">
+                <!-- Se llena dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Pasar datos del usuario al JavaScript
+    const userRole = '<%= user.nombre_rol %>';
+    const userIdPersonal = '<%= user.id_personal %>';
+
+    // Inicializar con semana actual
+    function inicializarFechas() {
+        const hoy = new Date();
+        const inicioSemana = new Date(hoy.setDate(hoy.getDate() - hoy.getDay() + 1));
+        const finSemana = new Date(inicioSemana);
+        finSemana.setDate(finSemana.getDate() + 6);
+
+        document.getElementById('fecha_inicio').valueAsDate = inicioSemana;
+        document.getElementById('fecha_fin').valueAsDate = finSemana;
+    }
+
+    function presetSemana() {
+        inicializarFechas();
+    }
+
+    function presetMes() {
+        const hoy = new Date();
+        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        const finMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+
+        document.getElementById('fecha_inicio').valueAsDate = inicioMes;
+        document.getElementById('fecha_fin').valueAsDate = finMes;
+    }
+
+    async function filtrarCitas() {
+        let id_personal = document.getElementById('id_personal')?.value;
+        const fecha_inicio = document.getElementById('fecha_inicio').value;
+        const fecha_fin = document.getElementById('fecha_fin').value;
+        const estado = document.getElementById('estado').value;
+
+        // Si es médico, usar su propio id_personal
+        if (userRole === 'medico') {
+            id_personal = userIdPersonal;
+        }
+
+        if (!id_personal) {
+            mostrarAlerta('Por favor selecciona un médico', 'danger');
+            return;
+        }
+
+        if (!fecha_inicio || !fecha_fin) {
+            mostrarAlerta('Por favor selecciona rango de fechas', 'danger');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/citas/agenda/listar?id_personal=${id_personal}&fecha_inicio=${fecha_inicio}&fecha_fin=${fecha_fin}&estado=${estado}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            // Mostrar conteos
+            const conteos = data.conteos || {};
+            document.getElementById('total-citas').textContent = conteos.total_citas || 0;
+            document.getElementById('citas-confirmadas').textContent = conteos.citas_confirmadas || 0;
+            document.getElementById('citas-completadas').textContent = conteos.citas_completadas || 0;
+            document.getElementById('citas-canceladas').textContent = conteos.citas_canceladas || 0;
+            document.getElementById('citas-hoy').textContent = conteos.citas_hoy || 0;
+            document.getElementById('conteos-container').style.display = 'grid';
+
+            // Llenar tabla
+            const citas = data.citas || [];
+            const tbody = document.getElementById('citas-tbody');
+            tbody.innerHTML = '';
+
+            if (citas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay citas para los filtros seleccionados</td></tr>';
+                return;
+            }
+
+            citas.forEach(cita => {
+                const estadoBadge = {
+                    'confirmada': '<span class="badge bg-success">Confirmada</span>',
+                    'completada': '<span class="badge bg-info">Completada</span>',
+                    'cancelada': '<span class="badge bg-danger">Cancelada</span>'
+                }[cita.estado_cita] || '<span class="badge bg-secondary">Desconocido</span>';
+
+                const botones = [];
+                botones.push(`<button class="btn-action ver" title="Ver detalles" onclick="verDetalles('${cita.id_cita}')">Ver</button>`);
+                
+                // Solo mostrar Reprog. si: es ventanilla, está confirmada y AÚN NO ha sido reprogramada
+                if (userRole === 'ventanilla' && cita.estado_cita === 'confirmada' && cita.nro_reprogramaciones === 0) {
+                    botones.push(`<a href="/citas/${cita.id_cita}/reprogramar" class="btn-action reprogram" title="Reprogramar cita (solo 1 vez)">Reprog.</a>`);
+                }
+                
+                // Mostrar Marcar Asistencia solo si está confirmada (ventanilla)
+                if (userRole === 'ventanilla' && cita.estado_cita === 'confirmada') {
+                    botones.push(`<button class="btn-action asistencia" title="Marcar asistencia" onclick="abrirModalAsistencia('${cita.id_cita}')">Asist.</button>`);
+                }
+                
+                // Mostrar Cancelar solo si está confirmada
+                if (userRole === 'ventanilla' && cita.estado_cita === 'confirmada') {
+                    botones.push(`<button class="btn-action cancelar" title="Cancelar cita" onclick="cancelarCita('${cita.id_cita}')">Cancelar</button>`);
+                }
+
+                const row = `
+                    <tr>
+                        <td><strong>${cita.fecha_formato}</strong></td>
+                        <td>${cita.hora_formato}</td>
+                        <td>${cita.nombre_paciente}</td>
+                        <td>${cita.celular || '-'}</td>
+                        <td><small>${cita.nombre_servicio}</small></td>
+                        <td>${estadoBadge}</td>
+                        <td class="text-center">${cita.nro_reprogramaciones}</td>
+                        <td class="btn-group-container">
+                            ${botones.join('')}
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        } catch (error) {
+            console.error('Error al filtrar citas:', error);
+            mostrarAlerta('Error al cargar citas', 'danger');
+        }
+    }
+
+    async function verDetalles(id_cita) {
+        try {
+            const response = await fetch(`/citas/${id_cita}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            const cita = data.cita;
+            const detallesHtml = `
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong>ID Cita:</strong> ${cita.id_cita}</p>
+                        <p><strong>Paciente:</strong> ${cita.nombre_paciente}</p>
+                        <p><strong>Teléfono:</strong> ${cita.celular || '-'}</p>
+                        <p><strong>Email:</strong> ${cita.correo || '-'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Médico:</strong> ${cita.nombre_medico}</p>
+                        <p><strong>Fecha/Hora:</strong> ${cita.fecha_formato} a las ${cita.hora_formato}</p>
+                        <p><strong>Servicio:</strong> ${cita.nombre_servicio}</p>
+                        <p><strong>Estado:</strong> <span class="badge bg-primary">${cita.estado_cita}</span></p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <p><strong>Motivo Consulta:</strong></p>
+                        <p class="border p-2 bg-light">${cita.motivo_consulta || 'N/A'}</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <p><strong>Observaciones:</strong></p>
+                        <p class="border p-2 bg-light">${cita.observaciones || 'N/A'}</p>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <p><strong>Reprogramaciones:</strong> ${cita.nro_reprogramaciones}</p>
+                        <p><strong>Fecha Creación:</strong> ${cita.fecha_creacion ? new Date(cita.fecha_creacion).toLocaleString() : 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detalles-content').innerHTML = detallesHtml;
+            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+        } catch (error) {
+            console.error('Error al obtener detalles:', error);
+            mostrarAlerta('Error al cargar detalles', 'danger');
+        }
+    }
+
+    function mostrarAlerta(mensaje, tipo = 'danger') {
+        const alertasDiv = document.getElementById('alertas');
+        alertasDiv.innerHTML = `
+            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+
+    async function cancelarCita(id_cita) {
+        if (!confirm('¿Estás seguro de que deseas cancelar esta cita? Esta acción no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/citas/${id_cita}/cancelar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            mostrarAlerta('✅ ' + data.mensaje, 'success');
+            
+            // Refrescar tabla después de 1 segundo
+            setTimeout(() => {
+                filtrarCitas();
+            }, 1000);
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al cancelar cita', 'danger');
+        }
+    }
+
+    async function abrirModalAsistencia(id_cita) {
+        try {
+            const response = await fetch(`/citas/${id_cita}/marcar-asistencia`);
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            const cita = data.cita;
+            const aseguradoras = data.aseguradoras || [];
+
+            let aseguradoraHtml = '';
+            if (aseguradoras.length > 0) {
+                aseguradoraHtml = `
+                    <div class="mb-3">
+                        <label class="form-label">Aseguradora (Opcional)</label>
+                        <select class="form-select" id="id_aseguradora">
+                            <option value="">Sin aseguradora</option>
+                            ${aseguradoras.map(a => `
+                                <option value="${a.id_aseguradora}">
+                                    ${a.nombre_aseguradora} (Cobertura: ${a.porcentaje_cobertura}%)
+                                </option>
+                            `).join('')}
+                        </select>
+                        <small class="form-text text-muted">Solo se registrará 1 aseguradora por factura</small>
+                    </div>
+                `;
+            }
+
+            const modalContent = `
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong>Paciente:</strong> ${cita.nombre_paciente}</p>
+                        <p><strong>Teléfono:</strong> ${cita.celular || '-'}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Médico:</strong> ${cita.nombre_medico}</p>
+                        <p><strong>Fecha/Hora:</strong> ${cita.fecha_formato} a las ${cita.hora_formato}</p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <p><strong>Servicio:</strong> ${cita.nombre_servicio}</p>
+                        <p><strong>Precio:</strong> $${parseFloat(cita.precio_servicio).toFixed(2)}</p>
+                    </div>
+                </div>
+                ${aseguradoraHtml}
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="button" class="btn btn-success w-100" onclick="confirmarMarcarAsistencia('${id_cita}')">Marcar Asistencia</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('asistencia-content').innerHTML = modalContent;
+            new bootstrap.Modal(document.getElementById('modalAsistencia')).show();
+        } catch (error) {
+            console.error('Error al abrir modal:', error);
+            mostrarAlerta('Error al cargar datos', 'danger');
+        }
+    }
+
+    async function confirmarMarcarAsistencia(id_cita) {
+        try {
+            const id_aseguradora = document.getElementById('id_aseguradora')?.value || null;
+
+            const response = await fetch(`/citas/${id_cita}/marcar-asistencia`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id_aseguradora: id_aseguradora || null
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            // Cerrar modal
+            bootstrap.Modal.getInstance(document.getElementById('modalAsistencia')).hide();
+
+            mostrarAlerta('✅ Asistencia registrada. Cita completada.', 'success');
+            
+            // Refrescar tabla después de 1 segundo
+            setTimeout(() => {
+                filtrarCitas();
+            }, 1000);
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al marcar asistencia', 'danger');
+        }
+    }
+
+    // Inicializar al cargar
+    document.addEventListener('DOMContentLoaded', inicializarFechas);
+</script>

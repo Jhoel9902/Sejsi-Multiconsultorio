@@ -1,0 +1,280 @@
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2 class="mb-4">💳 Módulo de Pagos</h2>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-bold">Buscar por ID Cita</label>
+            <input type="text" class="form-control" id="id_cita_busqueda" placeholder="Ingresa ID de cita">
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-primary w-100" onclick="buscarFacturas()">🔍 Buscar</button>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    <div id="alertas"></div>
+
+    <!-- Tabla de Facturas -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm" id="tabla-facturas">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 20%;">Número Factura</th>
+                            <th style="width: 15%;">Tipo</th>
+                            <th style="width: 15%;">Subtotal</th>
+                            <th style="width: 15%;">Total</th>
+                            <th style="width: 20%;">Fecha Emisión</th>
+                            <th style="width: 15%;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="facturas-tbody">
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">Busca una cita para ver sus facturas</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalles Factura Cliente -->
+<div class="modal fade" id="modalFacturaCliente" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Factura Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="factura-cliente-content">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-success" onclick="abrirModalPago()">Registrar Pago</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Registrar Pago -->
+<div class="modal fade" id="modalRegistroPago" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Pago</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Método de Pago</label>
+                    <select class="form-select" id="metodo_pago">
+                        <option value="">Seleccionar método...</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta_credito">Tarjeta de Crédito</option>
+                        <option value="tarjeta_debito">Tarjeta de Débito</option>
+                        <option value="transferencia">Transferencia Bancaria</option>
+                        <option value="cheque">Cheque</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Monto a Pagar</label>
+                    <input type="number" class="form-control" id="monto_pago" readonly>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="confirmarPago()">Confirmar Pago</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let id_factura_actual = null;
+
+    async function buscarFacturas() {
+        const id_cita = document.getElementById('id_cita_busqueda').value.trim();
+
+        if (!id_cita) {
+            mostrarAlerta('Por favor ingresa el ID de cita', 'danger');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/pagos/cita/${id_cita}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                document.getElementById('facturas-tbody').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No se encontraron facturas</td></tr>';
+                return;
+            }
+
+            const facturas = data.facturas || [];
+            const tbody = document.getElementById('facturas-tbody');
+            tbody.innerHTML = '';
+
+            if (facturas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No hay facturas para esta cita</td></tr>';
+                return;
+            }
+
+            facturas.forEach(factura => {
+                const tipoBadge = factura.tipo_factura === 'cliente' 
+                    ? '<span class="badge bg-info">Cliente</span>' 
+                    : '<span class="badge bg-warning">Aseguradora</span>';
+
+                const row = `
+                    <tr>
+                        <td><strong>${factura.numero_factura}</strong></td>
+                        <td>${tipoBadge}</td>
+                        <td>$${parseFloat(factura.subtotal).toFixed(2)}</td>
+                        <td>$${parseFloat(factura.total).toFixed(2)}</td>
+                        <td>${new Date(factura.fecha_emision).toLocaleString()}</td>
+                        <td>
+                            ${factura.tipo_factura === 'cliente' 
+                                ? `<button class="btn btn-sm btn-primary" onclick="verFacturaCliente('${factura.id_factura_cliente}')">Ver</button>` 
+                                : '<button class="btn btn-sm btn-secondary" disabled>Ver</button>'}
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        } catch (error) {
+            console.error('Error al buscar facturas:', error);
+            mostrarAlerta('Error al buscar facturas', 'danger');
+        }
+    }
+
+    async function verFacturaCliente(id_factura) {
+        try {
+            const response = await fetch(`/pagos/factura-cliente/${id_factura}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            const factura = data.factura;
+            const detalles = data.detalles || [];
+
+            id_factura_actual = id_factura;
+            document.getElementById('monto_pago').value = factura.total;
+
+            const detallesHtml = detalles.map(d => `
+                <tr>
+                    <td>${d.descripcion || 'N/A'}</td>
+                    <td>${d.cantidad}</td>
+                    <td>$${parseFloat(d.precio_unitario).toFixed(2)}</td>
+                    <td>$${parseFloat(d.subtotal).toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            const contenido = `
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p><strong>Número Factura:</strong> ${factura.numero_factura}</p>
+                        <p><strong>Fecha Emisión:</strong> ${new Date(factura.fecha_emision).toLocaleDateString()}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Subtotal:</strong> $${parseFloat(factura.subtotal).toFixed(2)}</p>
+                        <p><strong>Total:</strong> $${parseFloat(factura.total).toFixed(2)}</p>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <h6>Detalles:</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Descripción</th>
+                                    <th>Cantidad</th>
+                                    <th>Unitario</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${detallesHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                ${factura.metodo_pago ? `
+                    <div class="alert alert-success">
+                        <strong>✓ Pagado</strong> - Método: ${factura.metodo_pago.toUpperCase()}
+                    </div>
+                ` : ''}
+            `;
+
+            document.getElementById('factura-cliente-content').innerHTML = contenido;
+            new bootstrap.Modal(document.getElementById('modalFacturaCliente')).show();
+        } catch (error) {
+            console.error('Error al obtener factura:', error);
+            mostrarAlerta('Error al obtener factura', 'danger');
+        }
+    }
+
+    function abrirModalPago() {
+        bootstrap.Modal.getInstance(document.getElementById('modalFacturaCliente')).hide();
+        new bootstrap.Modal(document.getElementById('modalRegistroPago')).show();
+    }
+
+    async function confirmarPago() {
+        const metodo_pago = document.getElementById('metodo_pago').value;
+
+        if (!metodo_pago) {
+            mostrarAlerta('Por favor selecciona un método de pago', 'danger');
+            return;
+        }
+
+        try {
+            const response = await fetch('/pagos/registrar-pago', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id_factura_cliente: id_factura_actual,
+                    metodo_pago
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('modalRegistroPago')).hide();
+            mostrarAlerta('✅ Pago registrado exitosamente', 'success');
+            
+            // Refrescar búsqueda
+            setTimeout(() => {
+                buscarFacturas();
+            }, 1500);
+        } catch (error) {
+            console.error('Error al registrar pago:', error);
+            mostrarAlerta('Error al registrar pago', 'danger');
+        }
+    }
+
+    function mostrarAlerta(mensaje, tipo = 'danger') {
+        const alertasDiv = document.getElementById('alertas');
+        alertasDiv.innerHTML = `
+            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+</script>
