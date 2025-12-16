@@ -980,9 +980,10 @@ INSERT INTO `tpersonal_especialidad` (`id_personal`, `id_especialidad`, `fecha_a
 CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
   `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `id_horario` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `dia_descanso` VARCHAR(20) DEFAULT NULL,
   `fecha_asignacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
-  PRIMARY KEY (`id_personal`,`id_horario`),
+  PRIMARY KEY (`id_personal`, `id_horario`),
   KEY `FK_ph_horario` (`id_horario`),
   CONSTRAINT `FK_ph_horario` FOREIGN KEY (`id_horario`) REFERENCES `thorario` (`id_horario`) ON DELETE CASCADE,
   CONSTRAINT `FK_ph_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`) ON DELETE CASCADE
@@ -1188,6 +1189,345 @@ BEGIN
     SET p_msg = 'Especialidad removida exitosamente';
   END IF;
 END//
+DELIMITER ;
+
+-- ================================================================
+-- MÓDULO DE HORARIOS (RF-HOR-01 y RF-HOR-02)
+-- ================================================================
+
+-- Agregar columnas a tpersonal_horario si no existen
+ALTER TABLE `tpersonal_horario` ADD COLUMN IF NOT EXISTS (
+    `dia_semana` INT NOT NULL DEFAULT 1,
+    `hora_inicio` TIME NOT NULL DEFAULT '08:00:00',
+    `hora_fin` TIME NOT NULL DEFAULT '12:00:00',
+    CHECK (`hora_fin` > `hora_inicio`),
+    CHECK (`dia_semana` BETWEEN 1 AND 7)
+);
+
+-- Insertar horarios predefinidos en thorario
+INSERT IGNORE INTO `thorario` (`id_horario`, `dia_semana`, `hora_inicio`, `hora_fin`, `descripcion`, `estado`, `fecha_creacion`) VALUES
+-- LUNES
+(UUID(), 1, '08:00:00', '12:00:00', 'Mañana Lunes', 1, CURRENT_TIMESTAMP),
+(UUID(), 1, '13:00:00', '17:00:00', 'Tarde Lunes', 1, CURRENT_TIMESTAMP),
+(UUID(), 1, '17:00:00', '21:00:00', 'Noche Lunes', 1, CURRENT_TIMESTAMP),
+-- MARTES
+(UUID(), 2, '08:00:00', '12:00:00', 'Mañana Martes', 1, CURRENT_TIMESTAMP),
+(UUID(), 2, '13:00:00', '17:00:00', 'Tarde Martes', 1, CURRENT_TIMESTAMP),
+(UUID(), 2, '17:00:00', '21:00:00', 'Noche Martes', 1, CURRENT_TIMESTAMP),
+-- MIÉRCOLES
+(UUID(), 3, '08:00:00', '12:00:00', 'Mañana Miércoles', 1, CURRENT_TIMESTAMP),
+(UUID(), 3, '13:00:00', '17:00:00', 'Tarde Miércoles', 1, CURRENT_TIMESTAMP),
+(UUID(), 3, '17:00:00', '21:00:00', 'Noche Miércoles', 1, CURRENT_TIMESTAMP),
+-- JUEVES
+(UUID(), 4, '08:00:00', '12:00:00', 'Mañana Jueves', 1, CURRENT_TIMESTAMP),
+(UUID(), 4, '13:00:00', '17:00:00', 'Tarde Jueves', 1, CURRENT_TIMESTAMP),
+(UUID(), 4, '17:00:00', '21:00:00', 'Noche Jueves', 1, CURRENT_TIMESTAMP),
+-- VIERNES
+(UUID(), 5, '08:00:00', '12:00:00', 'Mañana Viernes', 1, CURRENT_TIMESTAMP),
+(UUID(), 5, '13:00:00', '17:00:00', 'Tarde Viernes', 1, CURRENT_TIMESTAMP),
+(UUID(), 5, '17:00:00', '21:00:00', 'Noche Viernes', 1, CURRENT_TIMESTAMP),
+-- SÁBADO
+(UUID(), 6, '08:00:00', '12:00:00', 'Mañana Sábado', 1, CURRENT_TIMESTAMP),
+(UUID(), 6, '13:00:00', '17:00:00', 'Tarde Sábado', 1, CURRENT_TIMESTAMP),
+-- DOMINGO
+(UUID(), 7, '08:00:00', '12:00:00', 'Mañana Domingo', 1, CURRENT_TIMESTAMP),
+(UUID(), 7, '13:00:00', '17:00:00', 'Tarde Domingo', 1, CURRENT_TIMESTAMP);
+
+-- ================================================================
+-- SP: Obtener horarios de un personal
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_personal_obtener_horarios$$
+CREATE PROCEDURE sp_personal_obtener_horarios(
+    IN p_id_personal CHAR(36)
+)
+BEGIN
+  SELECT 
+    ph.id_personal_horario,
+    ph.dia_semana,
+    ph.hora_inicio,
+    ph.hora_fin,
+    ph.dia_descanso,
+    ph.estado,
+    ph.fecha_creacion,
+    CASE ph.dia_semana
+      WHEN 1 THEN 'Lunes'
+      WHEN 2 THEN 'Martes'
+      WHEN 3 THEN 'Miércoles'
+      WHEN 4 THEN 'Jueves'
+      WHEN 5 THEN 'Viernes'
+      WHEN 6 THEN 'Sábado'
+      WHEN 7 THEN 'Domingo'
+    END AS nombre_dia
+  FROM tpersonal_horario ph
+  WHERE ph.id_personal = p_id_personal
+  ORDER BY ph.dia_semana, ph.hora_inicio;
+END$$
+DELIMITER ;
+
+-- ================================================================
+-- SP: Asignar horario a personal (valida solapamientos y día descanso)
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_asignar_horario_personal$$
+CREATE PROCEDURE sp_asignar_horario_personal(
+    IN p_id_personal CHAR(36),
+    IN p_id_horario CHAR(36),
+    IN p_dia_descanso VARCHAR(20)
+)
+BEGIN
+  DECLARE v_dia_descanso_num INT;
+  DECLARE v_dia_semana INT;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  -- Validar que el horario existe
+  IF NOT EXISTS (SELECT 1 FROM thorario WHERE id_horario = p_id_horario) THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'El horario no existe';
+  END IF;
+
+  -- Obtener día de la semana del horario
+  SELECT dia_semana INTO v_dia_semana
+  FROM thorario WHERE id_horario = p_id_horario;
+
+  -- Validar día descanso válido
+  SET v_dia_descanso_num = CASE p_dia_descanso
+    WHEN 'Lunes' THEN 1
+    WHEN 'Martes' THEN 2
+    WHEN 'Miércoles' THEN 3
+    WHEN 'Jueves' THEN 4
+    WHEN 'Viernes' THEN 5
+    WHEN 'Sábado' THEN 6
+    WHEN 'Domingo' THEN 7
+    ELSE NULL
+  END;
+
+  IF v_dia_descanso_num IS NULL THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'Día de descanso inválido';
+  END IF;
+
+  -- Validar que no descansar en día que trabaja
+  IF v_dia_semana = v_dia_descanso_num THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'No puedes descansar el mismo día que trabajas';
+  END IF;
+
+  -- Validar que no exista solapamiento
+  IF EXISTS (
+    SELECT 1 FROM tpersonal_horario ph
+    JOIN thorario h ON ph.id_horario = h.id_horario
+    WHERE ph.id_personal = p_id_personal
+    AND h.dia_semana = v_dia_semana
+    AND ph.estado = 1
+    AND NOT (h.hora_fin <= (SELECT hora_inicio FROM thorario WHERE id_horario = p_id_horario)
+             OR h.hora_inicio >= (SELECT hora_fin FROM thorario WHERE id_horario = p_id_horario))
+  ) THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'Existe solapamiento: Hay otro horario en este día a la misma hora';
+  END IF;
+
+  START TRANSACTION;
+
+  INSERT INTO tpersonal_horario 
+    (id_personal, id_horario, dia_descanso, estado, fecha_asignacion)
+  VALUES 
+    (p_id_personal, p_id_horario, p_dia_descanso, 1, CURRENT_TIMESTAMP)
+  ON DUPLICATE KEY UPDATE
+    dia_descanso = p_dia_descanso,
+    estado = 1;
+
+  COMMIT;
+END$$
+
+  COMMIT;
+END$$
+DELIMITER ;
+
+-- ================================================================
+-- SP: Cambiar estado horario (bloquear/desbloquear solo futuros)
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_cambiar_estado_horario$$
+CREATE PROCEDURE sp_cambiar_estado_horario(
+    IN p_id_personal CHAR(36),
+    IN p_id_horario CHAR(36),
+    IN p_nuevo_estado TINYINT
+)
+BEGIN
+  DECLARE v_dia_semana INT;
+  DECLARE v_dia_actual INT;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  -- Obtener día de la semana del horario
+  SELECT dia_semana INTO v_dia_semana
+  FROM thorario
+  WHERE id_horario = p_id_horario;
+
+  -- Obtener día actual (1=Lunes, 7=Domingo)
+  SET v_dia_actual = CASE DAYOFWEEK(CURDATE())
+    WHEN 1 THEN 7
+    WHEN 2 THEN 1
+    WHEN 3 THEN 2
+    WHEN 4 THEN 3
+    WHEN 5 THEN 4
+    WHEN 6 THEN 5
+    WHEN 7 THEN 6
+  END;
+
+  -- Validar que no sea un horario pasado (solo se puede bloquear/desbloquear si es futuro)
+  IF v_dia_semana < v_dia_actual AND p_nuevo_estado = 0 THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'Horario pasado no editable';
+  END IF;
+
+  START TRANSACTION;
+
+  UPDATE tpersonal_horario
+  SET estado = p_nuevo_estado
+  WHERE id_personal = p_id_personal 
+  AND id_horario = p_id_horario;
+
+  COMMIT;
+END$$
+DELIMITER ;
+
+-- ================================================================
+-- SP: Remover horario de personal (desactivar)
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_remover_horario_personal$$
+CREATE PROCEDURE sp_remover_horario_personal(
+    IN p_id_personal_horario CHAR(36)
+)
+BEGIN
+  UPDATE tpersonal_horario
+  SET estado = 0
+  WHERE id_personal_horario = p_id_personal_horario;
+END$$
+DELIMITER ;
+
+-- ================================================================
+-- SP: Cambiar día de descanso del personal
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_cambiar_dia_descanso$$
+CREATE PROCEDURE sp_cambiar_dia_descanso(
+    IN p_id_personal CHAR(36),
+    IN p_dia_descanso VARCHAR(20)
+)
+BEGIN
+  DECLARE v_dia_descanso_num INT;
+  DECLARE v_existe_solapamiento INT;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  SET v_dia_descanso_num = CASE p_dia_descanso
+    WHEN 'Lunes' THEN 1
+    WHEN 'Martes' THEN 2
+    WHEN 'Miércoles' THEN 3
+    WHEN 'Jueves' THEN 4
+    WHEN 'Viernes' THEN 5
+    WHEN 'Sábado' THEN 6
+    WHEN 'Domingo' THEN 7
+    ELSE NULL
+  END;
+
+  IF v_dia_descanso_num IS NULL THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'Día de descanso inválido';
+  END IF;
+
+  SELECT COUNT(*) INTO v_existe_solapamiento
+  FROM tpersonal_horario
+  WHERE id_personal = p_id_personal
+  AND dia_semana = v_dia_descanso_num
+  AND estado = 1;
+
+  IF v_existe_solapamiento > 0 THEN
+    SIGNAL SQLSTATE '45000' 
+    SET MESSAGE_TEXT = 'No puedes cambiar el día de descanso: Existe horario asignado en ese día';
+  END IF;
+
+  START TRANSACTION;
+
+  UPDATE tpersonal_horario
+  SET dia_descanso = p_dia_descanso
+  WHERE id_personal = p_id_personal;
+
+  COMMIT;
+END$$
+DELIMITER ;
+
+-- ================================================================
+-- SP: Obtener horarios por personal con disponibilidad
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_personal_horarios_disponibilidad$$
+CREATE PROCEDURE sp_personal_horarios_disponibilidad(
+    IN p_id_personal CHAR(36)
+)
+BEGIN
+  SELECT 
+    ph.id_horario,
+    h.dia_semana,
+    CASE h.dia_semana
+      WHEN 1 THEN 'Lunes'
+      WHEN 2 THEN 'Martes'
+      WHEN 3 THEN 'Miércoles'
+      WHEN 4 THEN 'Jueves'
+      WHEN 5 THEN 'Viernes'
+      WHEN 6 THEN 'Sábado'
+      WHEN 7 THEN 'Domingo'
+    END AS nombre_dia,
+    h.hora_inicio,
+    h.hora_fin,
+    h.descripcion,
+    ph.dia_descanso,
+    ph.estado,
+    CASE 
+      WHEN ph.estado = 1 THEN 'Disponible'
+      WHEN ph.estado = 0 THEN 'Bloqueado'
+    END AS estado_label,
+    CONCAT(DATE_FORMAT(h.hora_inicio, '%H:%i'), ' - ', DATE_FORMAT(h.hora_fin, '%H:%i')) AS rango_horas
+  FROM tpersonal_horario ph
+  JOIN thorario h ON ph.id_horario = h.id_horario
+  WHERE ph.id_personal = p_id_personal
+  ORDER BY h.dia_semana, h.hora_inicio;
+END$$
+DELIMITER ;
+
+-- ================================================================
+-- SP: Listar todos los médicos con sus horarios
+-- ================================================================
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_listar_personal_horarios$$
+CREATE PROCEDURE sp_listar_personal_horarios()
+BEGIN
+  SELECT DISTINCT
+    p.id_personal,
+    CONCAT(p.nombres, ' ', p.apellido_paterno, ' ', COALESCE(p.apellido_materno, '')) AS nombre_completo,
+    p.ci,
+    p.celular,
+    COUNT(ph.id_personal_horario) AS total_horarios,
+    (SELECT DISTINCT dia_descanso FROM tpersonal_horario WHERE id_personal = p.id_personal LIMIT 1) AS dia_descanso
+  FROM tpersonal p
+  LEFT JOIN tpersonal_horario ph ON p.id_personal = ph.id_personal AND ph.estado = 1
+  WHERE p.estado = 1
+  GROUP BY p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.ci, p.celular
+  ORDER BY p.nombres, p.apellido_paterno;
+END$$
 DELIMITER ;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

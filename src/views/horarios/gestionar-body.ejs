@@ -1,0 +1,434 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <h5 class="card-title mb-0"><i class="bi bi-clock me-2"></i>Definir Horarios del Personal</h5>
+        </div>
+
+        <!-- Alertas -->
+        <% if (error && error.trim() !== '') { %>
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle me-2"></i><strong>Error:</strong> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        <% } %>
+
+        <div class="row">
+          <!-- Formulario -->
+          <div class="col-lg-6">
+            <div class="card bg-light">
+              <div class="card-body">
+                <h6 class="card-title mb-3"><i class="bi bi-plus-circle me-2"></i>Asignar Nuevo Horario</h6>
+
+                <div class="mb-3">
+                  <label for="selectPersonal" class="form-label">Personal <span class="text-danger">*</span></label>
+                  <select id="selectPersonal" class="form-select" required onchange="cargarHorarios()">
+                    <option value="">-- Seleccionar Personal --</option>
+                    <% personal.forEach(p => { %>
+                      <option value="<%= p.id_personal %>"><%= p.nombre_completo %> (C.I.: <%= p.ci %>)</option>
+                    <% }); %>
+                  </select>
+                </div>
+
+                <div class="mb-3">
+                  <label for="selectHorario" class="form-label">Horario Predefinido <span class="text-danger">*</span></label>
+                  <select id="selectHorario" class="form-select" required>
+                    <option value="">-- Seleccionar horario --</option>
+                    <optgroup label="Lunes">
+                      <% horarios.filter(h => h.dia_semana === 1).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                    <optgroup label="Martes">
+                      <% horarios.filter(h => h.dia_semana === 2).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                    <optgroup label="Miércoles">
+                      <% horarios.filter(h => h.dia_semana === 3).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                    <optgroup label="Jueves">
+                      <% horarios.filter(h => h.dia_semana === 4).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                    <optgroup label="Viernes">
+                      <% horarios.filter(h => h.dia_semana === 5).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                    <optgroup label="Sábado">
+                      <% horarios.filter(h => h.dia_semana === 6).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                    <optgroup label="Domingo">
+                      <% horarios.filter(h => h.dia_semana === 7).forEach(h => { %>
+                        <option value="<%= h.id_horario %>"><%= h.rango_horas %> - <%= h.descripcion %></option>
+                      <% }); %>
+                    </optgroup>
+                  </select>
+                  <small class="text-muted d-block mt-1">Los horarios disponibles son predefinidos por el sistema.</small>
+                </div>
+
+                <div class="mb-3">
+                  <label for="selectDescanso" class="form-label">Día de Descanso <span class="text-danger">*</span></label>
+                  <div class="input-group">
+                    <select id="selectDescanso" class="form-select" required>
+                      <option value="">-- Seleccionar día de descanso --</option>
+                      <option value="Lunes">Lunes</option>
+                      <option value="Martes">Martes</option>
+                      <option value="Miércoles">Miércoles</option>
+                      <option value="Jueves">Jueves</option>
+                      <option value="Viernes">Viernes</option>
+                      <option value="Sábado">Sábado</option>
+                      <option value="Domingo">Domingo</option>
+                    </select>
+                    <button type="button" id="btnCambiarDescanso" class="btn btn-outline-secondary" onclick="cambiarDiaDescanso()" style="display: none;" title="Cambiar día de descanso">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </button>
+                  </div>
+                  <small class="text-muted d-block mt-1">⚠️ El día de descanso se aplica a todos los horarios del personal</small>
+                </div>
+
+                <button type="button" id="btnAsignar" class="btn btn-primary w-100" onclick="asignarHorario()">
+                  <i class="bi bi-check-circle me-1"></i>Asignar Horario
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Horarios del personal seleccionado -->
+          <div class="col-lg-6">
+            <div class="card bg-light">
+              <div class="card-body">
+                <h6 class="card-title mb-3"><i class="bi bi-calendar-event me-2"></i>Horarios Asignados</h6>
+
+                <div id="horariosContainer">
+                  <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>Selecciona un personal para ver sus horarios.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de todos los horarios -->
+        <div class="mt-4 card">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-table me-2"></i>Detalle de Horarios</h6>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="fw-semibold">Personal</th>
+                    <th class="fw-semibold">Día</th>
+                    <th class="fw-semibold">Horario</th>
+                    <th class="fw-semibold">Descanso</th>
+                    <th class="fw-semibold text-center">Estado</th>
+                    <th class="fw-semibold text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaHorarios">
+                  <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                      <i class="bi bi-inbox me-2"></i>Selecciona un personal para ver sus horarios
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const diasSemana = {
+  1: 'Lunes',
+  2: 'Martes',
+  3: 'Miércoles',
+  4: 'Jueves',
+  5: 'Viernes',
+  6: 'Sábado',
+  7: 'Domingo'
+};
+
+// Cargar horarios de un personal
+function cargarHorarios() {
+  const idPersonal = document.getElementById('selectPersonal').value;
+
+  if (!idPersonal) {
+    document.getElementById('horariosContainer').innerHTML = `
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>Selecciona un personal para ver sus horarios.
+      </div>
+    `;
+    document.getElementById('tablaHorarios').innerHTML = `
+      <tr>
+        <td colspan="6" class="text-center text-muted py-4">
+          <i class="bi bi-inbox me-2"></i>Selecciona un personal para ver sus horarios
+        </td>
+      </tr>
+    `;
+    document.getElementById('selectDescanso').disabled = false;
+    document.getElementById('selectDescanso').value = '';
+    document.getElementById('btnCambiarDescanso').style.display = 'none';
+    return;
+  }
+
+  fetch(`/horarios/personal/${idPersonal}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && data.horarios.length > 0) {
+        const diaDescansoActual = data.horarios[0].dia_descanso;
+        const nombrePersonal = data.personal.nombre_completo || 'Sin nombre';
+        const ciPersonal = data.personal.ci || '-';
+
+        // Mostrar resumen
+        let html = '<div class="list-group list-group-sm">';
+        data.horarios.forEach(h => {
+          const badge = h.estado ? 'bg-success' : 'bg-warning';
+          const label = h.estado ? 'Disponible' : 'Bloqueado';
+          html += `
+            <div class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <strong>${h.nombre_dia}</strong>
+                  <br>
+                  <small class="text-muted">${h.rango_horas}</small>
+                </div>
+                <span class="badge ${badge}">${label}</span>
+              </div>
+            </div>
+          `;
+        });
+        html += '</div>';
+        document.getElementById('horariosContainer').innerHTML = html;
+
+        // Mostrar tabla
+        let tablaHtml = '';
+
+        data.horarios.forEach((h, index) => {
+          const badge = h.estado ? 'bg-success' : 'bg-warning';
+          const btnEstado = h.estado 
+            ? `<button type="button" class="btn btn-sm btn-warning" onclick="cambiarEstado('${idPersonal}', '${h.id_horario}', 0)" title="Bloquear">Bloquear</button>`
+            : `<button type="button" class="btn btn-sm btn-success" onclick="cambiarEstado('${idPersonal}', '${h.id_horario}', 1)" title="Desbloquear">Desbloquear</button>`;
+          
+          const btnRemover = `<button type="button" class="btn btn-sm btn-danger ms-1" onclick="removerHorario('${idPersonal}', '${h.id_horario}')" title="Remover horario">
+            <i class="bi bi-trash"></i>
+          </button>`;
+          
+          // Solo mostrar nombre del personal en la primera fila
+          const nombreCol = index === 0 
+            ? `<strong>${nombrePersonal}</strong><br><small class="text-muted">C.I.: ${ciPersonal}</small>`
+            : '';
+          
+          tablaHtml += `
+            <tr>
+              <td>${nombreCol}</td>
+              <td><strong>${h.nombre_dia}</strong></td>
+              <td>${h.rango_horas}</td>
+              <td><strong>${h.dia_descanso}</strong></td>
+              <td class="text-center"><span class="badge ${badge}">${h.estado_label}</span></td>
+              <td class="text-center">
+                ${btnEstado}
+                ${btnRemover}
+              </td>
+            </tr>
+          `;
+        });
+        document.getElementById('tablaHorarios').innerHTML = tablaHtml;
+
+        // Bloquear descanso: mostrar el actual y desactivar selector
+        document.getElementById('selectDescanso').value = diaDescansoActual;
+        document.getElementById('selectDescanso').disabled = true;
+        document.getElementById('btnCambiarDescanso').style.display = 'inline-block';
+      } else {
+        document.getElementById('horariosContainer').innerHTML = `
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>Este personal no tiene horarios asignados.
+          </div>
+        `;
+        document.getElementById('tablaHorarios').innerHTML = `
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4">
+              <i class="bi bi-inbox me-2"></i>Sin horarios asignados
+            </td>
+          </tr>
+        `;
+        
+        // Desbloquear descanso si no hay horarios
+        document.getElementById('selectDescanso').disabled = false;
+        document.getElementById('selectDescanso').value = '';
+        document.getElementById('btnCambiarDescanso').style.display = 'none';
+      }
+    })
+    .catch(err => {
+      alert('Error al cargar horarios: ' + err.message);
+    });
+}
+
+// Asignar horario
+function asignarHorario() {
+  const idPersonal = document.getElementById('selectPersonal').value;
+  const idHorario = document.getElementById('selectHorario').value;
+  const selectDescanso = document.getElementById('selectDescanso');
+  let diaDescanso = selectDescanso.value;
+
+  if (!idPersonal || !idHorario) {
+    alert('Por favor selecciona personal y horario.');
+    return;
+  }
+
+  if (selectDescanso.disabled) {
+    diaDescanso = selectDescanso.value;
+  } else {
+    if (!diaDescanso) {
+      alert('Por favor selecciona un día de descanso.');
+      return;
+    }
+  }
+
+  const btnAsignar = document.getElementById('btnAsignar');
+  const btnText = btnAsignar.innerHTML;
+  btnAsignar.disabled = true;
+  btnAsignar.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Asignando...';
+
+  (function asignarDia() {
+
+    fetch('/horarios/asignar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id_personal: idPersonal,
+        id_horario: idHorario,
+        dia_descanso: diaDescanso
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      btnAsignar.disabled = false;
+      btnAsignar.innerHTML = btnText;
+      
+      if (data.success) {
+        alert(data.mensaje);
+        document.getElementById('selectHorario').value = '';
+        cargarHorarios();
+      } else {
+        alert('Error: ' + data.mensaje);
+      }
+    })
+    .catch(err => {
+      btnAsignar.disabled = false;
+      btnAsignar.innerHTML = btnText;
+      alert('Error: ' + err.message);
+    });
+  })();
+}
+
+// Cambiar estado de horario
+function cambiarEstado(idPersonal, idHorario, nuevoEstado) {
+  const label = nuevoEstado === 1 ? 'desbloquear' : 'bloquear';
+  if (!confirm(`¿Deseas ${label} este horario?`)) return;
+
+  fetch('/horarios/cambiar-estado', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id_personal: idPersonal,
+      id_horario: idHorario,
+      nuevo_estado: nuevoEstado
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert(data.mensaje);
+      cargarHorarios();
+    } else {
+      alert('Error: ' + data.mensaje);
+    }
+  })
+  .catch(err => alert('Error: ' + err.message));
+}
+
+// Remover horario
+function removerHorario(idPersonal, idHorario) {
+  if (!confirm('¿Deseas remover este horario del personal?')) {
+    return;
+  }
+
+  fetch('/horarios/remover', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id_personal: idPersonal,
+      id_horario: idHorario
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert(data.mensaje);
+      cargarHorarios();
+    } else {
+      alert('Error: ' + data.mensaje);
+    }
+  })
+  .catch(err => alert('Error: ' + err.message));
+}
+
+// Cambiar día de descanso para TODOS los horarios del personal
+function cambiarDiaDescanso() {
+  const idPersonal = document.getElementById('selectPersonal').value;
+  const diaDescansoActual = document.getElementById('selectDescanso').value;
+  const dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
+  if (confirm(`¿Cambiar día de descanso de "${diaDescansoActual}" para este personal? (Afectará todos sus horarios)`)) {
+    const opcionsMenu = dias.map((d, i) => `${i + 1}. ${d}`).join('\n');
+    const selectIndex = prompt(`Días disponibles:\n${opcionsMenu}\n\nSelecciona el número del nuevo día de descanso (1-7):`);
+    
+    if (!selectIndex || isNaN(selectIndex)) return;
+    const newDia = dias[parseInt(selectIndex) - 1];
+    if (!newDia) {
+      alert('Selección inválida');
+      return;
+    }
+
+    if (newDia === diaDescansoActual) {
+      alert('Es el mismo día que ya está seleccionado');
+      return;
+    }
+
+    fetch('/horarios/cambiar-dia-descanso', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id_personal: idPersonal,
+        dia_descanso: newDia
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert(data.mensaje);
+        cargarHorarios();
+      } else {
+        alert('Error: ' + data.mensaje);
+      }
+    })
+    .catch(err => alert('Error: ' + err.message));
+  }
+}
+
+</script>
