@@ -10,6 +10,8 @@ import especialidadesRouter from './routes/especialidades.js';
 import aseguradoresRouter from './routes/aseguradoras.js';
 import horariosRouter from './routes/horarios.js';
 import historialRouter from './routes/historial.js';
+import serviciosRouter from './routes/servicios.js';
+import recetasRouter from './routes/recetas.js';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -65,6 +67,8 @@ app.use(especialidadesRouter);
 app.use(aseguradoresRouter);
 app.use(horariosRouter);
 app.use('/historial', historialRouter);
+app.use('/historial', recetasRouter);
+app.use(serviciosRouter);
 
 // 404 - Página no encontrada
 app.use((req, res) => {

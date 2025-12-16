@@ -1,0 +1,84 @@
+<!-- DETALLES DEL SERVICIO -->
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="bi bi-info-circle me-2"></i>Detalles del Servicio</h4>
+                    <a href="/servicios" class="btn btn-light btn-sm">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5 class="text-primary"><%= servicio.nombre %></h5>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <p class="text-muted mb-1">Precio</p>
+                            <h6 class="badge bg-success fs-5">Bs. <%= parseFloat(servicio.precio).toFixed(2) %></h6>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted mb-1">Estado</p>
+                            <% if (servicio.estado === 1) { %>
+                                <span class="badge bg-success">Activo</span>
+                            <% } else { %>
+                                <span class="badge bg-danger">Inactivo</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <p class="text-muted mb-2"><strong>Descripción</strong></p>
+                        <p><%= servicio.descripcion || 'Sin descripción' %></p>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-4">
+                        <small class="text-muted">
+                            <strong>Creado:</strong> <%= new Date(servicio.fecha_creacion).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %>
+                        </small>
+                    </div>
+
+                    <% if (user && user.nombre_rol === 'admin') { %>
+                        <div class="d-flex gap-2">
+                            <a href="/servicios/editar/<%= servicio.id_servicio %>" class="btn btn-warning flex-grow-1">
+                                <i class="bi bi-pencil-square me-2"></i>Editar
+                            </a>
+                            <button class="btn btn-danger" onclick="toggleEstado('<%= servicio.id_servicio %>')">
+                                <i class="bi bi-toggle-on me-2"></i>Cambiar Estado
+                            </button>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function toggleEstado(id) {
+    if (!confirm('¿Cambiar estado del servicio?')) return;
+
+    try {
+        const response = await fetch(`/servicios/toggle-estado/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.mensaje);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cambiar estado');
+    }
+}
+</script>

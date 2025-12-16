@@ -135,6 +135,59 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Recetas Emitidas -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Recetas Emitidas</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Formulario para nueva receta -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">Agregar Nueva Receta</h6>
+                        <form id="formAgregarReceta">
+                            <div class="row">
+                                <div class="col-md-12 mb-2">
+                                    <label for="medicamentos" class="form-label">Medicamentos *</label>
+                                    <textarea class="form-control" id="medicamentos" placeholder="Ej: Paracetamol, Amoxicilina 500mg" required></textarea>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label for="dosis" class="form-label">Dosis (Ej: 500 mg)</label>
+                                    <input type="text" class="form-control" id="dosis" placeholder="Ej: 500 mg, 2.5 ml">
+                                    <small class="text-muted">Formato: número + unidad (mg, ml, g, %)</small>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label for="frecuencia" class="form-label">Frecuencia</label>
+                                    <input type="text" class="form-control" id="frecuencia" placeholder="Ej: Cada 8 horas">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label for="duracion" class="form-label">Duración</label>
+                                    <input type="text" class="form-control" id="duracion" placeholder="Ej: 7 días">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label for="observaciones" class="form-label">Observaciones</label>
+                                    <input type="text" class="form-control" id="observaciones" placeholder="Ej: Tomar con alimentos">
+                                </div>
+                                <div class="col-md-12">
+                                    <button type="submit" class="btn btn-danger btn-sm">
+                                        <i class="bi bi-plus-circle me-2"></i>Agregar Receta
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <hr>
+
+                    <!-- Lista de recetas -->
+                    <h6 class="mb-3">Recetas del Paciente</h6>
+                    <div id="listaRecetas">
+                        <div class="alert alert-secondary">
+                            <small>Cargando recetas...</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -253,6 +306,121 @@ async function eliminarEstudio(idEstudio) {
     } catch (error) {
         console.error('Error:', error);
         alert('Error al eliminar');
+    }
+}
+
+// =============== RECETAS ===============
+
+// Cargar recetas al iniciar
+cargarRecetas();
+
+async function cargarRecetas() {
+    try {
+        const response = await fetch(`/historial/${idHistorial}/recetas`);
+        const recetas = await response.json();
+        
+        const listaRecetas = document.getElementById('listaRecetas');
+        
+        if (recetas.length === 0) {
+            listaRecetas.innerHTML = '<div class="alert alert-secondary"><small>Sin recetas registradas</small></div>';
+            return;
+        }
+        
+        listaRecetas.innerHTML = recetas.map(r => `
+            <div class="card mb-2" data-id-receta="${r.id_receta}">
+                <div class="card-body p-3">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <p class="mb-1"><strong>Medicamentos:</strong> ${r.medicamentos}</p>
+                            <p class="mb-1"><small><strong>Dosis:</strong> ${r.dosis || 'N/A'}</small></p>
+                            <p class="mb-1"><small><strong>Frecuencia:</strong> ${r.frecuencia || 'N/A'}</small></p>
+                            <p class="mb-1"><small><strong>Duración:</strong> ${r.duracion || 'N/A'}</small></p>
+                            <% if (r.observaciones) { %>
+                                <p class="mb-1"><small><strong>Observaciones:</strong> ${r.observaciones}</small></p>
+                            <% } %>
+                            <small class="text-muted">Médico: ${r.nombre_medico} - ${new Date(r.fecha_creacion).toLocaleDateString('es-ES')}</small>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-sm btn-primary w-100 mb-1" onclick="editarReceta('${r.id_receta}')">
+                                <i class="bi bi-pencil"></i> Editar
+                            </button>
+                            <button class="btn btn-sm btn-danger w-100" onclick="eliminarReceta('${r.id_receta}')">
+                                <i class="bi bi-trash"></i> Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error al cargar recetas:', error);
+        document.getElementById('listaRecetas').innerHTML = '<div class="alert alert-danger"><small>Error al cargar recetas</small></div>';
+    }
+}
+
+// Agregar receta
+document.getElementById('formAgregarReceta').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const medicamentos = document.getElementById('medicamentos').value.trim();
+    const dosis = document.getElementById('dosis').value.trim();
+    const frecuencia = document.getElementById('frecuencia').value.trim();
+    const duracion = document.getElementById('duracion').value.trim();
+    const observaciones = document.getElementById('observaciones').value.trim();
+    
+    try {
+        const response = await fetch(`/historial/${idHistorial}/recetas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id_cita: null,
+                medicamentos,
+                dosis: dosis || null,
+                frecuencia: frecuencia || null,
+                duracion: duracion || null,
+                observaciones: observaciones || null
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Receta creada exitosamente');
+            document.getElementById('formAgregarReceta').reset();
+            cargarRecetas();
+        } else {
+            alert('Error: ' + data.mensaje);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al crear receta');
+    }
+});
+
+async function editarReceta(idReceta) {
+    alert('Funcionalidad de edición en desarrollo');
+}
+
+async function eliminarReceta(idReceta) {
+    if (!confirm('¿Eliminar esta receta?')) return;
+    
+    try {
+        const response = await fetch(`/historial/recetas/${idReceta}/eliminar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Receta eliminada');
+            cargarRecetas();
+        } else {
+            alert('Error: ' + data.mensaje);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al eliminar receta');
     }
 }
 </script>

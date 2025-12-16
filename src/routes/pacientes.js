@@ -213,7 +213,27 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     const [[output]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje, @p_codigo AS codigo');
 
     if (output.success) {
+      // Obtener el ID del paciente creado (usar el más reciente con el CI que acabamos de registrar)
+      const [pacienteCreado] = await pool.query('SELECT id_paciente FROM tpaciente WHERE ci = ? LIMIT 1', [ci]);
+      
+      if (pacienteCreado && pacienteCreado.length > 0) {
+        const id_paciente = pacienteCreado[0].id_paciente;
+        
+        // Crear un historial vacío para el paciente
+        try {
+          await pool.query(
+            `INSERT INTO thistorial_paciente (id_paciente, diagnosticos, evoluciones, antecedentes, tratamientos, estado, fecha_creacion)
+             VALUES (?, '', '', '', '', 1, NOW())`,
+            [id_paciente]
+          );
+        } catch (err) {
+          console.error('Error al crear historial vacío:', err);
+          // No detener el proceso si falla la creación del historial
+        }
+      }
+      
       return res.redirect('/pacientes?success=Paciente registrado exitosamente.');
+
     } else {
       return res.status(400).render('pacientes/crear', {
         user: req.user,

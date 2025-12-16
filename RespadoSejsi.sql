@@ -48,6 +48,150 @@ END//
 DELIMITER ;
 
 DELIMITER //
+CREATE PROCEDURE `sp_esp_actualizar`(
+  IN p_id_especialidad CHAR(36),
+  IN p_nombre VARCHAR(50),
+  IN p_descripcion TEXT,
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al actualizar especialidad';
+  END;
+  
+  IF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Especialidad no encontrada';
+  ELSEIF EXISTS(SELECT 1 FROM tespecialidad WHERE nombre = p_nombre AND id_especialidad != p_id_especialidad AND estado = TRUE) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'El nombre de especialidad ya existe';
+  ELSE
+    UPDATE tespecialidad
+    SET nombre = p_nombre, descripcion = p_descripcion
+    WHERE id_especialidad = p_id_especialidad;
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad actualizada exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_esp_asignar_medico`(
+  IN p_id_personal CHAR(36),
+  IN p_id_especialidad CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al asignar especialidad';
+  END;
+  
+  IF NOT EXISTS(SELECT 1 FROM tpersonal WHERE id_personal = p_id_personal) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Personal no encontrado';
+  ELSEIF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Especialidad no encontrada';
+  ELSEIF EXISTS(SELECT 1 FROM tpersonal_especialidad WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad) THEN
+    -- Si ya existe pero está inactiva, reactivarla
+    UPDATE tpersonal_especialidad
+    SET estado = TRUE
+    WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad;
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad asignada exitosamente';
+  ELSE
+    INSERT INTO tpersonal_especialidad (id_personal, id_especialidad, estado)
+    VALUES (p_id_personal, p_id_especialidad, TRUE);
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad asignada exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_esp_listar`()
+BEGIN
+  SELECT id_especialidad, nombre, descripcion, fecha_creacion, estado
+  FROM tespecialidad
+  WHERE estado = TRUE
+  ORDER BY nombre ASC;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_esp_obtener_por_id`(IN p_id_especialidad CHAR(36))
+BEGIN
+  SELECT id_especialidad, nombre, descripcion, fecha_creacion, estado
+  FROM tespecialidad
+  WHERE id_especialidad = p_id_especialidad;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_esp_quitar_medico`(
+  IN p_id_personal CHAR(36),
+  IN p_id_especialidad CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al quitar especialidad';
+  END;
+  
+  IF NOT EXISTS(SELECT 1 FROM tpersonal_especialidad WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'La especialidad no estaba asignada';
+  ELSE
+    UPDATE tpersonal_especialidad
+    SET estado = FALSE
+    WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad;
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad removida exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_esp_registrar`(
+  IN p_nombre VARCHAR(50),
+  IN p_descripcion TEXT,
+  OUT p_id_especialidad CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    SET p_success = FALSE;
+    SET p_msg = 'Error al registrar especialidad';
+  END;
+  
+  IF p_nombre IS NULL OR p_nombre = '' THEN
+    SET p_success = FALSE;
+    SET p_msg = 'El nombre es requerido';
+  ELSEIF EXISTS(SELECT 1 FROM tespecialidad WHERE nombre = p_nombre AND estado = TRUE) THEN
+    SET p_success = FALSE;
+    SET p_msg = 'El nombre de especialidad ya existe';
+  ELSE
+    SET p_id_especialidad = UUID();
+    INSERT INTO tespecialidad (id_especialidad, nombre, descripcion, estado)
+    VALUES (p_id_especialidad, p_nombre, p_descripcion, TRUE);
+    SET p_success = TRUE;
+    SET p_msg = 'Especialidad registrada exitosamente';
+  END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
 CREATE PROCEDURE `sp_pac_actualizar`(
     IN p_id_paciente CHAR(36),
     IN p_nombre VARCHAR(60),
@@ -663,7 +807,7 @@ BEGIN
         -- Generar UUID para el nuevo personal
         SET v_nuevo_id = UUID();
         
-        -- Insertar personal con UUID este se papea alguno SP por que alchile SIUUUU!!!! explícito
+        -- Insertar personal con UUID explícito
         INSERT INTO tpersonal (
             id_personal, ci, nombres, apellido_paterno, apellido_materno, cargo, id_rol,
             fecha_nacimiento, fecha_contratacion, domicilio, celular, correo,
@@ -771,11 +915,16 @@ CREATE TABLE IF NOT EXISTS `tespecialidad` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `tespecialidad` (`id_especialidad`, `nombre`, `descripcion`, `fecha_creacion`, `estado`) VALUES
-	('840a94ea-d884-11f0-81b0-40c2ba62ef61', 'Cardiología', 'Especialista en enfermedades del corazón', '2025-12-13 20:33:31', 1),
+	('4a32dfa3-d9e6-11f0-a245-40c2ba62ef61', 'JúJá', 'asda', '2025-12-15 14:45:55', 1),
+	('840a94ea-d884-11f0-81b0-40c2ba62ef61', 'cardiologia', 'Especialista en enfermedades del corazón de seda', '2025-12-13 20:33:31', 1),
 	('840aa3d8-d884-11f0-81b0-40c2ba62ef61', 'Dermatología', 'Especialista en enfermedades de la piel', '2025-12-13 20:33:31', 1),
 	('840aa712-d884-11f0-81b0-40c2ba62ef61', 'Pediatría', 'Especialista en atención de niños', '2025-12-13 20:33:31', 1),
 	('840aa926-d884-11f0-81b0-40c2ba62ef61', 'Neurología', 'Especialista en el sistema nervioso', '2025-12-13 20:33:31', 1),
-	('840aab7f-d884-11f0-81b0-40c2ba62ef61', 'Psiquiatría', 'Especialista en salud mental', '2025-12-13 20:33:31', 1);
+	('840aab7f-d884-11f0-81b0-40c2ba62ef61', 'Psiquiatría', 'Especialista en salud mental', '2025-12-13 20:33:31', 1),
+	('e11e459a-d9e5-11f0-a245-40c2ba62ef61', 'prueba', 'asdas\r\n', '2025-12-15 14:42:59', 1),
+	('e39e2309-d9e4-11f0-a245-40c2ba62ef61', 'causologia', 'el estudio de los causas', '2025-12-15 14:35:54', 1),
+	('f0688302-d9e5-11f0-a245-40c2ba62ef61', 'jeremías', 'asdasd', '2025-12-15 14:43:25', 1),
+	('fa528efa-d9e0-11f0-a245-40c2ba62ef61', 'cosmologia', 'no tiene sentido pero no valida hasta este punto', '2025-12-15 14:07:54', 1);
 
 CREATE TABLE IF NOT EXISTS `testudio` (
   `id_estudio` char(36) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
@@ -894,10 +1043,42 @@ CREATE TABLE IF NOT EXISTS `tpaciente` (
 
 INSERT INTO `tpaciente` (`id_paciente`, `nombre`, `apellido_paterno`, `apellido_materno`, `fecha_nacimiento`, `ci`, `estado_civil`, `domicilio`, `nacionalidad`, `tipo_sangre`, `alergias`, `contacto_emerg`, `enfermedad_base`, `observaciones`, `celular`, `correo`, `codigo_paciente`, `estado`, `fecha_creacion`, `fecha_actualizacion`) VALUES
 	('03fb938c-d864-11f0-9531-40c2ba62ef61', 'prueba123', 'jasdjo', 'aosdjas', '2002-02-25', '123124', 'Viudo/a', NULL, 'brasileño', 'B+', NULL, 'nose', NULL, NULL, '54641216s', 'asd@jfksd.com', 'PAC-20251213-63710', 1, '2025-12-13 16:40:52', NULL),
-	('958f8df6-d860-11f0-9531-40c2ba62ef61', 'Juanito Canchero mod por vent', 'Flores', 'Del prado', '1996-07-30', '965548', 'Divorciado/a', NULL, 'Cubano', 'A-', NULL, NULL, NULL, NULL, '75584213', 'juanito@papilla.com', 'PAC-20251213-11324', 0, '2025-12-13 16:16:18', '2025-12-13 18:07:59'),
+	('06e285d5-da06-11f0-90da-40c2ba62ef61', 'María Fernanda', 'Gómez', 'Rodríguez', '1985-07-15', '9876543', 'Casada', 'Av. Principal #123, Zona Norte', 'Boliviana', 'O+', 'Penicilina, Mariscos', 'Juan Gómez - 76543210', 'Hipertensión arterial leve', 'Paciente controla presión regularmente', '71234567', 'maria.gomez@email.com', 'PAC-2024-001', 1, '2025-12-15 18:33:06', NULL),
+	('147cfd96-d9c5-11f0-a984-40c2ba62ef61', 'Juanito', 'canchero', 'german', '2017-05-02', '765451', 'Divorciado/a', NULL, 'colombiano', 'AB+', NULL, 'sadasdas', NULL, NULL, '7784531', 'jasdja@gmail.com', 'PAC-20251215-30235', 1, '2025-12-15 10:48:12', NULL),
+	('4d526a5f-d9fd-11f0-935d-40c2ba62ef61', 'PEPillo', 'ADasda', NULL, '2022-10-29', '7741214', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '12345678900', NULL, 'PAC-20251215-29997', 1, '2025-12-15 17:30:39', '2025-12-15 17:32:15'),
+	('5f4ca611-d900-11f0-8c16-40c2ba62ef61', 'asds', 'asdasd', '', NULL, 'asdasd', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PAC-20251214-21969', 1, '2025-12-14 11:20:07', NULL),
+	('706ad9a8-da05-11f0-90da-40c2ba62ef61', 'Pepillo uno', 'adasd', NULL, '2020-10-27', '7777777', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '77777777771', NULL, 'PAC-20251215-84751', 1, '2025-12-15 18:28:54', NULL),
+	('7f0a3a26-da06-11f0-90da-40c2ba62ef61', 'Zephyr', 'Quinones', 'Xicay', '1992-05-14', '1502934', 'Soltero', 'Calle Nebulosa #45', 'Guatemalteca', 'AB-', 'Polen, Látex', 'Calixto Quinones - 73214567', 'Asma moderada', 'Usa inhalador preventivo', '73214567', 'zephyr.quinones@email.com', 'PAC-2005-001', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a40cb-da06-11f0-90da-40c2ba62ef61', 'Thalassa', 'Yaxcal', 'Ixmucane', '1988-11-03', '2611887', 'Casada', 'Av. Galaxia #78', 'Maya', 'O+', 'Ninguna conocida', 'Kukulkan Yaxcal - 73012345', 'Migrañas ocasionales', 'Sensible a cambios de clima', '73012345', 'thalassa.yaxcal@email.com', 'PAC-2005-002', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a43e3-da06-11f0-90da-40c2ba62ef61', 'Orion', 'Zotz', 'Kukulkan', '1995-07-22', '3407956', 'Soltero', 'Residencial Cosmos #12', 'Mexicana', 'B+', 'Penicilina', 'Citlali Zotz - 71234598', 'Ninguna', 'Practica deportes extremos', '71234598', 'orion.zotz@email.com', 'PAC-2005-003', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a4674-da06-11f0-90da-40c2ba62ef61', 'Eos', 'Ixchel', 'Chac', '1975-12-30', '0430751', 'Viuda', 'Calle Aurora #33', 'Hondureña', 'A-', 'Mariscos, Nueces', 'Kinich Ixchel - 78012345', 'Diabetes tipo 2', 'Control con metformina', '78012345', 'eos.ixchel@email.com', 'PAC-2005-004', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a48bb-da06-11f0-90da-40c2ba62ef61', 'Caelum', 'Tohil', 'Hunahpu', '2000-01-15', '7600159', 'Soltero', 'Urbanización Eclipse #67', 'Salvadoreña', 'O-', 'Polvo doméstico', 'Ixquic Tohil - 79123456', 'Rinitis alérgica', 'Usa antihistamínicos diarios', '79123456', 'caelum.tohil@email.com', 'PAC-2005-005', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a4aff-da06-11f0-90da-40c2ba62ef61', 'Lyra', 'Cizin', 'Zipacna', '1998-09-08', '8700983', 'Divorciada', 'Pasaje Estelar #89', 'Nicaragüense', 'AB+', 'Látex, Yodo', 'Cabrakán Cizin - 70129876', 'Hipertiroidismo', 'En tratamiento con tapazol', '70129876', 'lyra.cizin@email.com', 'PAC-2005-006', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a4d72-da06-11f0-90da-40c2ba62ef61', 'Altair', 'Ahau', 'Kawil', '1983-04-17', '2104832', 'Casado', 'Boulevard Cósmico #21', 'Beliceña', 'B-', 'Analgésicos NSAIDs', 'Chac Ahau - 73219876', 'Artritis reumatoide', 'Control reumatológico', '73219876', 'altair.ahau@email.com', 'PAC-2005-007', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a4fd5-da06-11f0-90da-40c2ba62ef61', 'Nyx', 'Hurakan', 'Camazotz', '1991-08-25', '2908914', 'Soltera', 'Calle Nocturna #54', 'Costarricense', 'A+', 'Moho, Ácaros', 'Gucumatz Hurakan - 74098765', 'Psoriasis', 'Tratamiento tópico', '74098765', 'nyx.hurakan@email.com', 'PAC-2005-008', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a5234-da06-11f0-90da-40c2ba62ef61', 'Sirius', 'Vucub', 'Caquix', '1978-06-11', '1606785', 'Casado', 'Av. Luminosa #76', 'Panameña', 'O+', 'Picaduras de abeja', 'Hun-Came Vucub - 76543210', 'Hipertensión', 'Control con enalapril', '76543210', 'sirius.vucub@email.com', 'PAC-2005-009', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a54a4-da06-11f0-90da-40c2ba62ef61', 'Andromeda', 'Xbalanque', 'Votan', '1986-02-28', '5902867', 'Soltera', 'Residencial Andrómeda #43', 'Colombiana', 'AB-', 'Lactosa', 'Hunahpu Xbalanque - 71239876', 'Síndrome de ovario poliquístico', 'Seguimiento ginecológico', '71239876', 'andromeda.xbalanque@email.com', 'PAC-2005-010', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a5706-da06-11f0-90da-40c2ba62ef61', 'Polaris', 'Tepeu', 'Gukumatz', '1993-10-05', '0310938', 'Casado', 'Calle Polar #19', 'Peruana', 'B+', 'Sulfas', 'Qʼuqʼumatz Tepeu - 73098712', 'Epilepsia controlada', 'Toma carbamazepina', '73098712', 'polaris.tepeu@email.com', 'PAC-2005-011', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a5948-da06-11f0-90da-40c2ba62ef61', 'Vega', 'Alom', 'Quetzalcoatl', '2002-03-19', '1503027', 'Soltera', 'Pasaje Celeste #88', 'Ecuatoriana', 'A-', 'Polen de gramíneas', 'Tohil Alom - 79123098', 'Asma infantil', 'Controlada con budesonide', '79123098', 'vega.alom@email.com', 'PAC-2005-012', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a5b8b-da06-11f0-90da-40c2ba62ef61', 'Rigel', 'Qaholom', 'Huracan', '1972-07-07', '0707724', 'Viudo', 'Av. Antigua #65', 'Chilena', 'O-', 'Contraste yodado', 'Bitol Qaholom - 78091234', 'Enfisema pulmonar', 'Ex fumador, oxigenoterapia', '78091234', 'rigel.qaholom@email.com', 'PAC-2005-013', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a5df4-da06-11f0-90da-40c2ba62ef61', 'Betelgeuse', 'Tzacol', 'Kukulcan', '1996-11-21', '2111965', 'Soltero', 'Calle Gigante Roja #27', 'Argentina', 'AB+', 'Anestésicos generales', 'Alom Tzacol - 70128765', 'Apnea del sueño', 'Usa CPAP nocturno', '70128765', 'betelgeuse.tzacol@email.com', 'PAC-2005-014', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a605f-da06-11f0-90da-40c2ba62ef61', 'Arcturus', 'Bitol', 'Hurakan', '1980-09-14', '1409803', 'Divorciado', 'Boulevard Áureo #52', 'Uruguaya', 'B-', 'Gluten', 'Qaholom Bitol - 73210987', 'Enfermedad celíaca', 'Dieta sin gluten estricta', '73210987', 'arcturus.bitol@email.com', 'PAC-2005-015', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a635f-da06-11f0-90da-40c2ba62ef61', 'Cassiopeeia', 'Hun-Came', 'Camazotz', '1987-12-08', '0812876', 'Casada', 'Residencial Real #34', 'Paraguaya', 'A+', 'Ácaros, epitelio de gato', 'Vucub Hun-Came - 74056789', 'Dermatitis atópica', 'Hidratación constante', '74056789', 'cassiopeeia.huncame@email.com', 'PAC-2005-016', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a6674-da06-11f0-90da-40c2ba62ef61', 'Deneb', 'Qʼuqʼumatz', 'Caquix', '1994-04-01', '0104945', 'Soltero', 'Clete Cisne #77', 'Brasileña', 'O+', 'Veneno de serpiente', 'Tepeu Qʼuqʼumatz - 76540987', 'Insuficiencia renal crónica', 'Diálisis 3 veces por semana', '76540987', 'deneb.ququmatz@email.com', 'PAC-2005-017', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a67f9-da06-11f0-90da-40c2ba62ef61', 'Antares', 'Tohil', 'Votan', '1999-06-30', '3006992', 'Soltero', 'Av. Escorpión #13', 'Dominicana', 'AB-', 'Mariscos, maní', 'Alom Tohil - 71230987', 'Anafilaxia por alimentos', 'Porta epinefrina autoinyectable', '71230987', 'antares.tohil@email.com', 'PAC-2005-018', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a693f-da06-11f0-90da-40c2ba62ef61', 'Fomalhaut', 'Chac', 'Gukumatz', '1982-05-25', '2505821', 'Casado', 'Boulevard Pez Austral #46', 'Puertorriqueña', 'B+', 'Ninguna', 'Ixchel Chac - 73098765', 'Hipotiroidismo', 'Levotiroxina 75mcg diarios', '73098765', 'fomalhaut.chac@email.com', 'PAC-2005-019', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a6abd-da06-11f0-90da-40c2ba62ef61', 'Mirach', 'Kinich', 'Quetzalcoatl', '1997-08-12', '1208974', 'Soltera', 'Clete Andrómeda #92', 'Cubana', 'A-', 'Látex, frutas tropicales', 'Ahau Kinich - 79123409', 'Síndrome de Ehlers-Danlos', 'Control genético', '79123409', 'mirach.kinich@email.com', 'PAC-2005-020', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a6c26-da06-11f0-90da-40c2ba62ef61', 'Alpheratz', 'Ixquic', 'Huracan', '1984-01-07', '0701843', 'Divorciada', 'Residencial Pegaso #58', 'Venezolana', 'O-', 'Anticonvulsivos', 'Zotz Ixquic - 70120987', 'Esclerosis múltiple', 'Tratamiento con interferón', '70120987', 'alpheratz.ixquic@email.com', 'PAC-2005-021', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a6d69-da06-11f0-90da-40c2ba62ef61', 'Capella', 'Cabrakán', 'Kukulkan', '1976-03-18', '1803768', 'Viuda', 'Av. Cochero #29', 'Española', 'AB+', 'Polen de olivo', 'Cizin Cabrakán - 73214509', 'Fibromialgia', 'Terapia física y medicación', '73214509', 'capella.cabrakán@email.com', 'PAC-2005-022', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'Aldebaran', 'Gucumatz', 'Camazotz', '1990-10-09', '0910901', 'Casado', 'Calle Toro #63', 'Francesa', 'B-', 'Anisakis', 'Hurakan Gucumatz - 74012398', 'Colitis ulcerosa', 'En remisión con mesalazina', '74012398', 'aldebaran.gucumatz@email.com', 'PAC-2005-023', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a6feb-da06-11f0-90da-40c2ba62ef61', 'Regulus', 'Hunahpu', 'Caquix', '2001-02-23', '2302018', 'Soltero', 'Pasaje León #14', 'Italiana', 'A+', 'Penicilina, cefalosporinas', 'Xbalanque Hunahpu - 76543290', 'Ninguna', 'Deportista amateur', '76543290', 'regulus.hunahpu@email.com', 'PAC-2005-024', 1, '2025-12-15 18:36:28', NULL),
+	('7f0a7193-da06-11f0-90da-40c2ba62ef61', 'Spica', 'Qaholom', 'Votan', '1989-07-04', '0407895', 'Casada', 'Boulevard Virgen #71', 'Alemana', 'O+', 'Sol, protector solar químico', 'Bitol Qaholom - 71239087', 'Lupus eritematoso', 'Protección solar estricta', '71239087', 'spica.qaholom@email.com', 'PAC-2005-025', 1, '2025-12-15 18:36:28', NULL),
+	('859d8b07-da05-11f0-90da-40c2ba62ef61', 'Pepillo dos', 'dos', NULL, '2022-10-29', '7777771', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '77777777772', NULL, 'PAC-20251215-41506', 1, '2025-12-15 18:29:29', NULL),
+	('958f8df6-d860-11f0-9531-40c2ba62ef61', 'Juanito Canchero mod por vent', 'Flores', 'Del prado', '1996-07-30', '965548', 'Divorciado/a', NULL, 'Cubano', 'A-', NULL, NULL, NULL, NULL, '75584213', 'juanito@papilla.com', 'PAC-20251213-11324', 1, '2025-12-13 16:16:18', '2025-12-15 18:29:02'),
+	('9b5c7160-da05-11f0-90da-40c2ba62ef61', 'Pepillo', 'cero', 'tres', '2020-09-28', '7777773', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '77777777773', NULL, 'PAC-20251215-53275', 1, '2025-12-15 18:30:06', NULL),
 	('ab57c083-d864-11f0-9531-40c2ba62ef61', 'María Elena', 'García', 'López', '1985-06-15', '1234567', 'Casada', 'Av. Ballivián #123, Zona Sopocachi', 'Boliviana', 'O+', 'Penicilina, Polen', 'Carlos García - 71234567', 'Hipertensión leve', 'Control cada 6 meses', '59171234567', 'maria.garcia@email.com', 'PAC-20241201-00123', 1, '2025-12-13 16:45:33', '2025-12-13 17:03:01'),
 	('ab57cd83-d864-11f0-9531-40c2ba62ef61', 'Juan Carlos', 'Rodríguez', 'Pérez', '1990-03-22', '2345678', 'Soltero', 'Calle Murillo #456, Zona Sur', 'Boliviana', 'A+', 'Mariscos', 'Ana Rodríguez - 72234567', 'Ninguna', 'Primera consulta', '59172234567', 'juan.rodriguez@email.com', 'PAC-20241201-00234', 1, '2025-12-13 16:45:33', '2025-12-13 18:07:51'),
-	('ab57d017-d864-11f0-9531-40c2ba62ef61', 'Ana Patricia', 'Martínez', 'González', '1978-11-05', '3456789', 'Divorciada', 'Av. Arce #789, Centro', 'Boliviana', 'B+', 'Ácaros del polvo', 'Pedro Martínez - 73234567', 'Diabetes tipo 2', 'Requiere control de glucosa', '59173234567', 'ana.martinez@email.com', 'PAC-20241201-00345', 0, '2025-12-13 16:45:33', '2025-12-13 16:59:21'),
+	('ab57d017-d864-11f0-9531-40c2ba62ef61', 'Ana Patricia', 'Martínez', 'González', '1978-11-05', '3456789', 'Divorciada', 'Av. Arce #789, Centro', 'Boliviana', 'B+', 'Ácaros del polvo', 'Pedro Martínez - 73234567', 'Diabetes tipo 2', 'Requiere control de glucosa', '59173234567', 'ana.martinez@email.com', 'PAC-20241201-00345', 1, '2025-12-13 16:45:33', '2025-12-15 18:29:00'),
 	('ab57d20c-d864-11f0-9531-40c2ba62ef61', 'Luis Alberto', 'Fernández', 'Silva', '1965-09-30', '4567890', 'Casado', 'Calle España #234, Miraflores', 'Boliviana', 'AB+', 'Ninguna', 'Carmen Fernández - 74234567', 'Artritis', 'Tratamiento continuo', '59174234567', 'luis.fernandez@email.com', 'PAC-20241201-00456', 1, '2025-12-13 16:45:33', NULL),
 	('ab57d3d9-d864-11f0-9531-40c2ba62ef61', 'Carolina', 'Vargas', 'Rojas', '1995-02-14', '5678901', 'Soltera', 'Av. Busch #567, Calacoto', 'Boliviana', 'O-', 'Lactosa', 'Miguel Vargas - 75234567', 'Asma', 'Usa inhalador', '59175234567', 'carolina.vargas@email.com', 'PAC-20241201-00567', 1, '2025-12-13 16:45:33', NULL),
 	('ab57d5cc-d864-11f0-9531-40c2ba62ef61', 'Roberto', 'Chávez', 'Mendoza', '1982-07-19', '6789012', 'Casado', 'Calle Potosí #890, San Pedro', 'Boliviana', 'A-', 'Polen, Pelo de gato', 'Lucía Chávez - 76234567', 'Colesterol alto', 'Dieta especial', '59176234567', 'roberto.chavez@email.com', 'PAC-20241201-00678', 1, '2025-12-13 16:45:33', NULL),
@@ -914,7 +1095,10 @@ INSERT INTO `tpaciente` (`id_paciente`, `nombre`, `apellido_paterno`, `apellido_
 	('ab57fa07-d864-11f0-9531-40c2ba62ef61', 'Eduardo', 'Zeballos', 'Córdova', '1955-10-10', '5566778', 'Viudo', 'Residencial Los Pinos #123, Irpavi', 'Boliviana', 'A+', 'Aspirina', 'Claudia Zeballos - 76234478', 'Parkinson, Osteoporosis', 'Cuidado especial, movilidad reducida', '59176234478', 'eduardo.zeballos@email.com', 'PAC-20241201-01789', 1, '2025-12-13 16:45:33', NULL),
 	('ab57fd94-d864-11f0-9531-40c2ba62ef61', 'Andrea', 'Cruz', 'Valdez', '1991-06-30', '6677889', 'Soltera', 'Av. Libertador #456, San Miguel', 'Boliviana', 'O-', 'Mariscos, Frutillas', 'Ricardo Cruz - 77234489', 'Síndrome de ovario poliquístico', 'Control ginecológico', '59177234489', 'andrea.cruz@email.com', 'PAC-20241201-01890', 1, '2025-12-13 16:45:33', NULL),
 	('ab580051-d864-11f0-9531-40c2ba62ef61', 'Ricardo', 'Gómez', 'Alvarez', '1972-12-12', '7788990', 'Casado', 'Calle Jordán #789, Sopocachi', 'Boliviana', 'B-', 'Ninguna', 'Silvia Gómez - 78234490', 'Apnea del sueño', 'Usa CPAP nocturno', '59178234490', 'ricardo.gomez@email.com', 'PAC-20241201-01901', 1, '2025-12-13 16:45:33', NULL),
-	('ab5802dd-d864-11f0-9531-40c2ba62ef61', 'Camila', 'Romero', 'Díaz', '1996-03-08', '8899001', 'Soltera', 'Av. Costanera #123, Achumani', 'Boliviana', 'A+', 'Antiinflamatorios', 'Pedro Romero - 79234501', 'Ninguna', 'Deportista profesional, chequeo anual', '59179234501', 'camila.romero@email.com', 'PAC-20241201-02012', 1, '2025-12-13 16:45:33', NULL);
+	('ab5802dd-d864-11f0-9531-40c2ba62ef61', 'Camila', 'Romero', 'Díaz', '1996-03-08', '8899001', 'Soltera', 'Av. Costanera #123, Achumani', 'Boliviana', 'A+', 'Antiinflamatorios', 'Pedro Romero - 79234501', 'Ninguna', 'Deportista profesional, chequeo anual', '59179234501', 'camila.romero@email.com', 'PAC-20241201-02012', 1, '2025-12-13 16:45:33', NULL),
+	('af470af8-d8fd-11f0-8c16-40c2ba62ef61', 'Juanito', 'asdasd', 'asdasd', '2023-10-02', '214314', 'Viudo/a', NULL, 'Peruano', 'A+', NULL, 'nose', NULL, NULL, 'asdasd1', 'jahsd@gmail.com', 'PAC-20251214-35655', 1, '2025-12-14 11:00:52', NULL),
+	('b12183db-da05-11f0-90da-40c2ba62ef61', 'Pepillo', 'cero', 'cuatro', '2024-10-30', '7777774', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '77777777774', NULL, 'PAC-20251215-41859', 1, '2025-12-15 18:30:42', NULL),
+	('b96e8ba3-d9fb-11f0-935d-40c2ba62ef61', 'Juanita', 'Mariaca', NULL, NULL, '8741214', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '1234567891', NULL, 'PAC-20251215-75334', 1, '2025-12-15 17:19:21', NULL);
 
 CREATE TABLE IF NOT EXISTS `tpaciente_aseguradora` (
   `id_paciente` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -956,11 +1140,18 @@ CREATE TABLE IF NOT EXISTS `tpersonal` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `tpersonal` (`id_personal`, `ci`, `nombres`, `apellido_paterno`, `apellido_materno`, `cargo`, `id_rol`, `fecha_nacimiento`, `fecha_contratacion`, `domicilio`, `celular`, `correo`, `contrasena`, `foto_perfil`, `archivo_contrato`, `estado`, `fecha_creacion`, `fecha_actualizacion`) VALUES
-	('1ba0c06e-d88c-11f0-81b0-40c2ba62ef61', '123121', 'prueba foto', 'asd', 'asda', 'none', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '1991-11-30', '2010-01-01', 'asda', 'adsjnasdl', 'a@gmai.com', '$2a$10$jTReL0zmZcbnlFNjWQBXAeOT6XwPmLoXgp.KFrQ5OPGHpSTVI3O0a', '/uploads/personal/fotos/foto-1765676180798-996527428.jpg', NULL, 1, '2025-12-13 21:27:51', '2025-12-13 21:36:20'),
+	('1ba0c06e-d88c-11f0-81b0-40c2ba62ef61', '123121', 'prueba foto', 'asd', 'asda', 'none', '0fe2393a-d854-11f0-9531-40c2ba62ef61', '1991-11-30', '2010-01-01', 'asda', 'adsjnasdl', 'a@gmai.com', '$2a$10$jTReL0zmZcbnlFNjWQBXAeOT6XwPmLoXgp.KFrQ5OPGHpSTVI3O0a', '/uploads/personal/fotos/foto-1765676180798-996527428.jpg', NULL, 1, '2025-12-13 21:27:51', '2025-12-15 16:48:10'),
 	('2821f798-d85b-11f0-9531-40c2ba62ef61', '675125', 'Jhoel Marvin', 'Limachi', 'Bonilla', 'Administrador', '0fe2336b-d854-11f0-9531-40c2ba62ef61', '2002-09-26', '2025-12-13', NULL, NULL, 'Jhoel@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', '/uploads/personal/fotos/foto-1765675928282-918611041.jpg', NULL, 1, '2025-12-13 15:37:27', '2025-12-13 21:32:08'),
 	('33d3476d-d861-11f0-9531-40c2ba62ef61', '54654651', 'pepito', 'gonzales modeado', '', 'ginecologo', '0fe2336b-d854-11f0-9531-40c2ba62ef61', '2025-12-13', NULL, NULL, NULL, 'pepito@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', '/uploads/personal/fotos/foto-1765676317215-913481727.jpg', NULL, 1, '2025-12-13 16:20:44', '2025-12-13 21:38:37'),
+	('3e847911-d9fe-11f0-935d-40c2ba62ef61', '6777157', 'mamanis', 'asdasd', NULL, '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2001-11-30', '2023-11-01', NULL, '7894561230', NULL, '$2a$10$cpYAsbUjxm8X1HUKGv5kouAfMaCGygdDRsougkUx7ou3LiFnGJOxO', NULL, NULL, 0, '2025-12-15 17:37:24', '2025-12-15 17:38:12'),
 	('401fc518-d85c-11f0-9531-40c2ba62ef61', '75875', 'jose armando', 'modificadillo', 'guzman', 'unificador', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2025-12-13', NULL, NULL, NULL, 'juanito@gmail.com', '$2b$10$utTYp.fFgqMJmLp8bxbQkOcv60K7x/eQHTRjsXk2O3g1TlBdq00vK', '/uploads/personal/fotos/foto-1765675427553-391774339.jpg', NULL, 1, '2025-12-13 15:45:17', '2025-12-13 21:23:47'),
-	('69a37493-d87f-11f0-81b0-40c2ba62ef61', '6784411', 'Ignacio', 'Bocangel', '', 'Supervisor', '0fe2393a-d854-11f0-9531-40c2ba62ef61', '2004-05-16', '2014-08-21', 'Sopocachi', '74561511', 'Ignacio@gmail.com', '$2a$10$ZeP0iKiN/Y9VBLKQ/PC/x.eJNMWCfY3QRyOBLdNv92F6L6YEnK9MO', '/uploads/personal/fotos/foto-1765670219131-395354286.jpeg', '/uploads/personal/contratos/contrato-1765670219137-392840608.pdf', 1, '2025-12-13 19:56:59', NULL);
+	('69a37493-d87f-11f0-81b0-40c2ba62ef61', '6784411', 'Ignacio', 'Bocangel', '', 'Supervisor', '0fe2336b-d854-11f0-9531-40c2ba62ef61', '2004-05-16', '2014-08-21', 'Sopocachi', '74561511', 'Ignacio@gmail.com', '$2a$10$ZeP0iKiN/Y9VBLKQ/PC/x.eJNMWCfY3QRyOBLdNv92F6L6YEnK9MO', '/uploads/personal/fotos/foto-1765670219131-395354286.jpeg', '/uploads/personal/contratos/contrato-1765670219137-392840608.pdf', 1, '2025-12-13 19:56:59', '2025-12-14 10:56:42'),
+	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', '123123', 'pepillo', 'sad', 'canseco', 'general', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2011-03-31', '2025-01-02', 'alla aca nose', '7784111', 'asd@gmail.com', '$2a$10$9RYoLB3Mn/0mne55JJtBJOTvWjVLjFkw4g3n/96as2rphLuvDABey', '/uploads/personal/fotos/foto-1765822262868-831568755.jpg', '/uploads/personal/contratos/contrato-1765822262869-780216618.pdf', 1, '2025-12-15 14:11:03', '2025-12-15 16:48:34'),
+	('80e5b362-d9fa-11f0-935d-40c2ba62ef61', '6775125', 'Jhoel Medico', 'Lima', 'Boni', 'unificador', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2006-04-30', '2023-07-02', NULL, '1234567891', 'Jhoel@pruebamed.com', '$2a$10$QtF7d2ZDDEcTYGFOaBMg2.W0mPmNBULywNDVTHPkp.gT2cLc0bYvi', NULL, NULL, 1, '2025-12-15 17:10:37', NULL),
+	('8c338e27-d9e2-11f0-a245-40c2ba62ef61', '7567443', 'asdqwe', 'qqqqq', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', NULL, NULL, NULL, NULL, 'ooop@sdasd.com', '$2a$10$nQay.m929V6aRm54RyRgkO1S4y4FCG5Kys57lEiufRgQOt8C1lUvC', NULL, NULL, 1, '2025-12-15 14:19:08', NULL),
+	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', '77765', 'asda', 'asda', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', NULL, NULL, NULL, NULL, 'a22@gmai.com', '$2a$10$wVNHxIc5a/KsHA8Fbv/iAurqy1i/hZo7ct4FbEC1mXKwqu0MyZ6uq', NULL, NULL, 1, '2025-12-15 14:12:08', NULL),
+	('95c8ca08-d9e3-11f0-a245-40c2ba62ef61', '88485', '', '', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', NULL, '2025-01-01', NULL, NULL, NULL, '$2a$10$A2sh9Vw0Q8Z13CX/nLHlX.OOfj4WdFjJ.ZHP2RiuWJlbXo8b/11l.', NULL, NULL, 1, '2025-12-15 14:26:34', NULL),
+	('ee955eac-d9e3-11f0-a245-40c2ba62ef61', '1312', '12312122', '154adsa', '', '', '0fe23b2d-d854-11f0-9531-40c2ba62ef61', '2011-02-02', '2020-11-30', NULL, NULL, NULL, '$2a$10$KmFfoKr2kUbFprgpxNdwu.jCW07hPHOa.2HK/vm1oyPbu8DvUzrcC', NULL, NULL, 1, '2025-12-15 14:29:03', NULL);
 
 CREATE TABLE IF NOT EXISTS `tpersonal_especialidad` (
   `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -974,16 +1165,28 @@ CREATE TABLE IF NOT EXISTS `tpersonal_especialidad` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `tpersonal_especialidad` (`id_personal`, `id_especialidad`, `fecha_asignacion`, `estado`) VALUES
+	('3e847911-d9fe-11f0-935d-40c2ba62ef61', '840aa3d8-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 17:37:24', 1),
 	('401fc518-d85c-11f0-9531-40c2ba62ef61', '840a94ea-d884-11f0-81b0-40c2ba62ef61', '2025-12-13 20:38:30', 1),
-	('401fc518-d85c-11f0-9531-40c2ba62ef61', '840aa712-d884-11f0-81b0-40c2ba62ef61', '2025-12-13 21:09:56', 1);
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', '840aa712-d884-11f0-81b0-40c2ba62ef61', '2025-12-13 21:09:56', 1),
+	('401fc518-d85c-11f0-9531-40c2ba62ef61', 'fa528efa-d9e0-11f0-a245-40c2ba62ef61', '2025-12-15 14:08:17', 1),
+	('6abcf8c5-d9e1-11f0-a245-40c2ba62ef61', 'e39e2309-d9e4-11f0-a245-40c2ba62ef61', '2025-12-15 14:54:50', 1),
+	('80e5b362-d9fa-11f0-935d-40c2ba62ef61', '840aa712-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 17:10:37', 1),
+	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', '4a32dfa3-d9e6-11f0-a245-40c2ba62ef61', '2025-12-15 14:48:34', 1),
+	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', '840aa712-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 14:49:10', 1),
+	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', '840aab7f-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 14:48:08', 1),
+	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', 'e11e459a-d9e5-11f0-a245-40c2ba62ef61', '2025-12-15 14:49:17', 1),
+	('918e5c0b-d9e1-11f0-a245-40c2ba62ef61', 'f0688302-d9e5-11f0-a245-40c2ba62ef61', '2025-12-15 14:48:03', 0),
+	('95c8ca08-d9e3-11f0-a245-40c2ba62ef61', '840aa926-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 14:26:34', 1),
+	('95c8ca08-d9e3-11f0-a245-40c2ba62ef61', 'fa528efa-d9e0-11f0-a245-40c2ba62ef61', '2025-12-15 14:26:34', 1),
+	('ee955eac-d9e3-11f0-a245-40c2ba62ef61', '840a94ea-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 14:29:03', 1),
+	('ee955eac-d9e3-11f0-a245-40c2ba62ef61', '840aa712-d884-11f0-81b0-40c2ba62ef61', '2025-12-15 14:29:03', 1);
 
 CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
   `id_personal` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
   `id_horario` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `dia_descanso` VARCHAR(20) DEFAULT NULL,
   `fecha_asignacion` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `estado` tinyint(1) NOT NULL DEFAULT '1',
-  PRIMARY KEY (`id_personal`, `id_horario`),
+  PRIMARY KEY (`id_personal`,`id_horario`),
   KEY `FK_ph_horario` (`id_horario`),
   CONSTRAINT `FK_ph_horario` FOREIGN KEY (`id_horario`) REFERENCES `thorario` (`id_horario`) ON DELETE CASCADE,
   CONSTRAINT `FK_ph_personal` FOREIGN KEY (`id_personal`) REFERENCES `tpersonal` (`id_personal`) ON DELETE CASCADE
@@ -1037,498 +1240,6 @@ CREATE TABLE IF NOT EXISTS `tservicio` (
   UNIQUE KEY `nombre` (`nombre`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ========================================
--- STORED PROCEDURES PARA ESPECIALIDADES
--- ========================================
-
--- SP: Registrar nueva especialidad
-DELIMITER //
-CREATE PROCEDURE `sp_esp_registrar`(
-  IN p_nombre VARCHAR(50),
-  IN p_descripcion TEXT,
-  OUT p_id_especialidad CHAR(36),
-  OUT p_success BOOLEAN,
-  OUT p_msg VARCHAR(255)
-)
-BEGIN
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    SET p_success = FALSE;
-    SET p_msg = 'Error al registrar especialidad';
-  END;
-  
-  IF p_nombre IS NULL OR p_nombre = '' THEN
-    SET p_success = FALSE;
-    SET p_msg = 'El nombre es requerido';
-  ELSEIF EXISTS(SELECT 1 FROM tespecialidad WHERE nombre = p_nombre AND estado = TRUE) THEN
-    SET p_success = FALSE;
-    SET p_msg = 'El nombre de especialidad ya existe';
-  ELSE
-    SET p_id_especialidad = UUID();
-    INSERT INTO tespecialidad (id_especialidad, nombre, descripcion, estado)
-    VALUES (p_id_especialidad, p_nombre, p_descripcion, TRUE);
-    SET p_success = TRUE;
-    SET p_msg = 'Especialidad registrada exitosamente';
-  END IF;
-END//
-DELIMITER ;
-
--- SP: Listar especialidades activas
-DELIMITER //
-CREATE PROCEDURE `sp_esp_listar`()
-BEGIN
-  SELECT id_especialidad, nombre, descripcion, fecha_creacion, estado
-  FROM tespecialidad
-  WHERE estado = TRUE
-  ORDER BY nombre ASC;
-END//
-DELIMITER ;
-
--- SP: Obtener especialidad por ID
-DELIMITER //
-CREATE PROCEDURE `sp_esp_obtener_por_id`(IN p_id_especialidad CHAR(36))
-BEGIN
-  SELECT id_especialidad, nombre, descripcion, fecha_creacion, estado
-  FROM tespecialidad
-  WHERE id_especialidad = p_id_especialidad;
-END//
-DELIMITER ;
-
--- SP: Actualizar especialidad
-DELIMITER //
-CREATE PROCEDURE `sp_esp_actualizar`(
-  IN p_id_especialidad CHAR(36),
-  IN p_nombre VARCHAR(50),
-  IN p_descripcion TEXT,
-  OUT p_success BOOLEAN,
-  OUT p_msg VARCHAR(255)
-)
-BEGIN
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    SET p_success = FALSE;
-    SET p_msg = 'Error al actualizar especialidad';
-  END;
-  
-  IF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
-    SET p_success = FALSE;
-    SET p_msg = 'Especialidad no encontrada';
-  ELSEIF EXISTS(SELECT 1 FROM tespecialidad WHERE nombre = p_nombre AND id_especialidad != p_id_especialidad AND estado = TRUE) THEN
-    SET p_success = FALSE;
-    SET p_msg = 'El nombre de especialidad ya existe';
-  ELSE
-    UPDATE tespecialidad
-    SET nombre = p_nombre, descripcion = p_descripcion
-    WHERE id_especialidad = p_id_especialidad;
-    SET p_success = TRUE;
-    SET p_msg = 'Especialidad actualizada exitosamente';
-  END IF;
-END//
-DELIMITER ;
-
--- SP: Asignar especialidad a un médico
-DELIMITER //
-CREATE PROCEDURE `sp_esp_asignar_medico`(
-  IN p_id_personal CHAR(36),
-  IN p_id_especialidad CHAR(36),
-  OUT p_success BOOLEAN,
-  OUT p_msg VARCHAR(255)
-)
-BEGIN
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    SET p_success = FALSE;
-    SET p_msg = 'Error al asignar especialidad';
-  END;
-  
-  IF NOT EXISTS(SELECT 1 FROM tpersonal WHERE id_personal = p_id_personal) THEN
-    SET p_success = FALSE;
-    SET p_msg = 'Personal no encontrado';
-  ELSEIF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
-    SET p_success = FALSE;
-    SET p_msg = 'Especialidad no encontrada';
-  ELSEIF EXISTS(SELECT 1 FROM tpersonal_especialidad WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad) THEN
-    -- Si ya existe pero está inactiva, reactivarla
-    UPDATE tpersonal_especialidad
-    SET estado = TRUE
-    WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad;
-    SET p_success = TRUE;
-    SET p_msg = 'Especialidad asignada exitosamente';
-  ELSE
-    INSERT INTO tpersonal_especialidad (id_personal, id_especialidad, estado)
-    VALUES (p_id_personal, p_id_especialidad, TRUE);
-    SET p_success = TRUE;
-    SET p_msg = 'Especialidad asignada exitosamente';
-  END IF;
-END//
-DELIMITER ;
-
--- SP: Quitar especialidad a un médico
-DELIMITER //
-CREATE PROCEDURE `sp_esp_quitar_medico`(
-  IN p_id_personal CHAR(36),
-  IN p_id_especialidad CHAR(36),
-  OUT p_success BOOLEAN,
-  OUT p_msg VARCHAR(255)
-)
-BEGIN
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    SET p_success = FALSE;
-    SET p_msg = 'Error al quitar especialidad';
-  END;
-  
-  IF NOT EXISTS(SELECT 1 FROM tpersonal_especialidad WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad) THEN
-    SET p_success = FALSE;
-    SET p_msg = 'La especialidad no estaba asignada';
-  ELSE
-    UPDATE tpersonal_especialidad
-    SET estado = FALSE
-    WHERE id_personal = p_id_personal AND id_especialidad = p_id_especialidad;
-    SET p_success = TRUE;
-    SET p_msg = 'Especialidad removida exitosamente';
-  END IF;
-END//
-DELIMITER ;
-
--- ================================================================
--- MÓDULO DE HORARIOS (RF-HOR-01 y RF-HOR-02)
--- ================================================================
-
--- Agregar columnas a tpersonal_horario si no existen
-ALTER TABLE `tpersonal_horario` ADD COLUMN IF NOT EXISTS (
-    `dia_semana` INT NOT NULL DEFAULT 1,
-    `hora_inicio` TIME NOT NULL DEFAULT '08:00:00',
-    `hora_fin` TIME NOT NULL DEFAULT '12:00:00',
-    CHECK (`hora_fin` > `hora_inicio`),
-    CHECK (`dia_semana` BETWEEN 1 AND 7)
-);
-
--- Insertar horarios predefinidos en thorario
-INSERT IGNORE INTO `thorario` (`id_horario`, `dia_semana`, `hora_inicio`, `hora_fin`, `descripcion`, `estado`, `fecha_creacion`) VALUES
--- LUNES
-(UUID(), 1, '08:00:00', '12:00:00', 'Mañana Lunes', 1, CURRENT_TIMESTAMP),
-(UUID(), 1, '13:00:00', '17:00:00', 'Tarde Lunes', 1, CURRENT_TIMESTAMP),
-(UUID(), 1, '17:00:00', '21:00:00', 'Noche Lunes', 1, CURRENT_TIMESTAMP),
--- MARTES
-(UUID(), 2, '08:00:00', '12:00:00', 'Mañana Martes', 1, CURRENT_TIMESTAMP),
-(UUID(), 2, '13:00:00', '17:00:00', 'Tarde Martes', 1, CURRENT_TIMESTAMP),
-(UUID(), 2, '17:00:00', '21:00:00', 'Noche Martes', 1, CURRENT_TIMESTAMP),
--- MIÉRCOLES
-(UUID(), 3, '08:00:00', '12:00:00', 'Mañana Miércoles', 1, CURRENT_TIMESTAMP),
-(UUID(), 3, '13:00:00', '17:00:00', 'Tarde Miércoles', 1, CURRENT_TIMESTAMP),
-(UUID(), 3, '17:00:00', '21:00:00', 'Noche Miércoles', 1, CURRENT_TIMESTAMP),
--- JUEVES
-(UUID(), 4, '08:00:00', '12:00:00', 'Mañana Jueves', 1, CURRENT_TIMESTAMP),
-(UUID(), 4, '13:00:00', '17:00:00', 'Tarde Jueves', 1, CURRENT_TIMESTAMP),
-(UUID(), 4, '17:00:00', '21:00:00', 'Noche Jueves', 1, CURRENT_TIMESTAMP),
--- VIERNES
-(UUID(), 5, '08:00:00', '12:00:00', 'Mañana Viernes', 1, CURRENT_TIMESTAMP),
-(UUID(), 5, '13:00:00', '17:00:00', 'Tarde Viernes', 1, CURRENT_TIMESTAMP),
-(UUID(), 5, '17:00:00', '21:00:00', 'Noche Viernes', 1, CURRENT_TIMESTAMP),
--- SÁBADO
-(UUID(), 6, '08:00:00', '12:00:00', 'Mañana Sábado', 1, CURRENT_TIMESTAMP),
-(UUID(), 6, '13:00:00', '17:00:00', 'Tarde Sábado', 1, CURRENT_TIMESTAMP),
--- DOMINGO
-(UUID(), 7, '08:00:00', '12:00:00', 'Mañana Domingo', 1, CURRENT_TIMESTAMP),
-(UUID(), 7, '13:00:00', '17:00:00', 'Tarde Domingo', 1, CURRENT_TIMESTAMP);
-
--- ================================================================
--- SP: Obtener horarios de un personal
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_personal_obtener_horarios$$
-CREATE PROCEDURE sp_personal_obtener_horarios(
-    IN p_id_personal CHAR(36)
-)
-BEGIN
-  SELECT 
-    ph.id_personal_horario,
-    ph.dia_semana,
-    ph.hora_inicio,
-    ph.hora_fin,
-    ph.dia_descanso,
-    ph.estado,
-    ph.fecha_creacion,
-    CASE ph.dia_semana
-      WHEN 1 THEN 'Lunes'
-      WHEN 2 THEN 'Martes'
-      WHEN 3 THEN 'Miércoles'
-      WHEN 4 THEN 'Jueves'
-      WHEN 5 THEN 'Viernes'
-      WHEN 6 THEN 'Sábado'
-      WHEN 7 THEN 'Domingo'
-    END AS nombre_dia
-  FROM tpersonal_horario ph
-  WHERE ph.id_personal = p_id_personal
-  ORDER BY ph.dia_semana, ph.hora_inicio;
-END$$
-DELIMITER ;
-
--- ================================================================
--- SP: Asignar horario a personal (valida solapamientos y día descanso)
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_asignar_horario_personal$$
-CREATE PROCEDURE sp_asignar_horario_personal(
-    IN p_id_personal CHAR(36),
-    IN p_id_horario CHAR(36),
-    IN p_dia_descanso VARCHAR(20)
-)
-BEGIN
-  DECLARE v_dia_descanso_num INT;
-  DECLARE v_dia_semana INT;
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    ROLLBACK;
-    RESIGNAL;
-  END;
-
-  -- Validar que el horario existe
-  IF NOT EXISTS (SELECT 1 FROM thorario WHERE id_horario = p_id_horario) THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'El horario no existe';
-  END IF;
-
-  -- Obtener día de la semana del horario
-  SELECT dia_semana INTO v_dia_semana
-  FROM thorario WHERE id_horario = p_id_horario;
-
-  -- Validar día descanso válido
-  SET v_dia_descanso_num = CASE p_dia_descanso
-    WHEN 'Lunes' THEN 1
-    WHEN 'Martes' THEN 2
-    WHEN 'Miércoles' THEN 3
-    WHEN 'Jueves' THEN 4
-    WHEN 'Viernes' THEN 5
-    WHEN 'Sábado' THEN 6
-    WHEN 'Domingo' THEN 7
-    ELSE NULL
-  END;
-
-  IF v_dia_descanso_num IS NULL THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'Día de descanso inválido';
-  END IF;
-
-  -- Validar que no descansar en día que trabaja
-  IF v_dia_semana = v_dia_descanso_num THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'No puedes descansar el mismo día que trabajas';
-  END IF;
-
-  -- Validar que no exista solapamiento
-  IF EXISTS (
-    SELECT 1 FROM tpersonal_horario ph
-    JOIN thorario h ON ph.id_horario = h.id_horario
-    WHERE ph.id_personal = p_id_personal
-    AND h.dia_semana = v_dia_semana
-    AND ph.estado = 1
-    AND NOT (h.hora_fin <= (SELECT hora_inicio FROM thorario WHERE id_horario = p_id_horario)
-             OR h.hora_inicio >= (SELECT hora_fin FROM thorario WHERE id_horario = p_id_horario))
-  ) THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'Existe solapamiento: Hay otro horario en este día a la misma hora';
-  END IF;
-
-  START TRANSACTION;
-
-  INSERT INTO tpersonal_horario 
-    (id_personal, id_horario, dia_descanso, estado, fecha_asignacion)
-  VALUES 
-    (p_id_personal, p_id_horario, p_dia_descanso, 1, CURRENT_TIMESTAMP)
-  ON DUPLICATE KEY UPDATE
-    dia_descanso = p_dia_descanso,
-    estado = 1;
-
-  COMMIT;
-END$$
-
-  COMMIT;
-END$$
-DELIMITER ;
-
--- ================================================================
--- SP: Cambiar estado horario (bloquear/desbloquear solo futuros)
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_cambiar_estado_horario$$
-CREATE PROCEDURE sp_cambiar_estado_horario(
-    IN p_id_personal CHAR(36),
-    IN p_id_horario CHAR(36),
-    IN p_nuevo_estado TINYINT
-)
-BEGIN
-  DECLARE v_dia_semana INT;
-  DECLARE v_dia_actual INT;
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    ROLLBACK;
-    RESIGNAL;
-  END;
-
-  -- Obtener día de la semana del horario
-  SELECT dia_semana INTO v_dia_semana
-  FROM thorario
-  WHERE id_horario = p_id_horario;
-
-  -- Obtener día actual (1=Lunes, 7=Domingo)
-  SET v_dia_actual = CASE DAYOFWEEK(CURDATE())
-    WHEN 1 THEN 7
-    WHEN 2 THEN 1
-    WHEN 3 THEN 2
-    WHEN 4 THEN 3
-    WHEN 5 THEN 4
-    WHEN 6 THEN 5
-    WHEN 7 THEN 6
-  END;
-
-  -- Validar que no sea un horario pasado (solo se puede bloquear/desbloquear si es futuro)
-  IF v_dia_semana < v_dia_actual AND p_nuevo_estado = 0 THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'Horario pasado no editable';
-  END IF;
-
-  START TRANSACTION;
-
-  UPDATE tpersonal_horario
-  SET estado = p_nuevo_estado
-  WHERE id_personal = p_id_personal 
-  AND id_horario = p_id_horario;
-
-  COMMIT;
-END$$
-DELIMITER ;
-
--- ================================================================
--- SP: Remover horario de personal (desactivar)
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_remover_horario_personal$$
-CREATE PROCEDURE sp_remover_horario_personal(
-    IN p_id_personal_horario CHAR(36)
-)
-BEGIN
-  UPDATE tpersonal_horario
-  SET estado = 0
-  WHERE id_personal_horario = p_id_personal_horario;
-END$$
-DELIMITER ;
-
--- ================================================================
--- SP: Cambiar día de descanso del personal
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_cambiar_dia_descanso$$
-CREATE PROCEDURE sp_cambiar_dia_descanso(
-    IN p_id_personal CHAR(36),
-    IN p_dia_descanso VARCHAR(20)
-)
-BEGIN
-  DECLARE v_dia_descanso_num INT;
-  DECLARE v_existe_solapamiento INT;
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    ROLLBACK;
-    RESIGNAL;
-  END;
-
-  SET v_dia_descanso_num = CASE p_dia_descanso
-    WHEN 'Lunes' THEN 1
-    WHEN 'Martes' THEN 2
-    WHEN 'Miércoles' THEN 3
-    WHEN 'Jueves' THEN 4
-    WHEN 'Viernes' THEN 5
-    WHEN 'Sábado' THEN 6
-    WHEN 'Domingo' THEN 7
-    ELSE NULL
-  END;
-
-  IF v_dia_descanso_num IS NULL THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'Día de descanso inválido';
-  END IF;
-
-  SELECT COUNT(*) INTO v_existe_solapamiento
-  FROM tpersonal_horario
-  WHERE id_personal = p_id_personal
-  AND dia_semana = v_dia_descanso_num
-  AND estado = 1;
-
-  IF v_existe_solapamiento > 0 THEN
-    SIGNAL SQLSTATE '45000' 
-    SET MESSAGE_TEXT = 'No puedes cambiar el día de descanso: Existe horario asignado en ese día';
-  END IF;
-
-  START TRANSACTION;
-
-  UPDATE tpersonal_horario
-  SET dia_descanso = p_dia_descanso
-  WHERE id_personal = p_id_personal;
-
-  COMMIT;
-END$$
-DELIMITER ;
-
--- ================================================================
--- SP: Obtener horarios por personal con disponibilidad
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_personal_horarios_disponibilidad$$
-CREATE PROCEDURE sp_personal_horarios_disponibilidad(
-    IN p_id_personal CHAR(36)
-)
-BEGIN
-  SELECT 
-    ph.id_horario,
-    h.dia_semana,
-    CASE h.dia_semana
-      WHEN 1 THEN 'Lunes'
-      WHEN 2 THEN 'Martes'
-      WHEN 3 THEN 'Miércoles'
-      WHEN 4 THEN 'Jueves'
-      WHEN 5 THEN 'Viernes'
-      WHEN 6 THEN 'Sábado'
-      WHEN 7 THEN 'Domingo'
-    END AS nombre_dia,
-    h.hora_inicio,
-    h.hora_fin,
-    h.descripcion,
-    ph.dia_descanso,
-    ph.estado,
-    CASE 
-      WHEN ph.estado = 1 THEN 'Disponible'
-      WHEN ph.estado = 0 THEN 'Bloqueado'
-    END AS estado_label,
-    CONCAT(DATE_FORMAT(h.hora_inicio, '%H:%i'), ' - ', DATE_FORMAT(h.hora_fin, '%H:%i')) AS rango_horas
-  FROM tpersonal_horario ph
-  JOIN thorario h ON ph.id_horario = h.id_horario
-  WHERE ph.id_personal = p_id_personal
-  ORDER BY h.dia_semana, h.hora_inicio;
-END$$
-DELIMITER ;
-
--- ================================================================
--- SP: Listar todos los médicos con sus horarios
--- ================================================================
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_listar_personal_horarios$$
-CREATE PROCEDURE sp_listar_personal_horarios()
-BEGIN
-  SELECT DISTINCT
-    p.id_personal,
-    CONCAT(p.nombres, ' ', p.apellido_paterno, ' ', COALESCE(p.apellido_materno, '')) AS nombre_completo,
-    p.ci,
-    p.celular,
-    COUNT(ph.id_personal_horario) AS total_horarios,
-    (SELECT DISTINCT dia_descanso FROM tpersonal_horario WHERE id_personal = p.id_personal LIMIT 1) AS dia_descanso
-  FROM tpersonal p
-  LEFT JOIN tpersonal_horario ph ON p.id_personal = ph.id_personal AND ph.estado = 1
-  WHERE p.estado = 1
-  GROUP BY p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.ci, p.celular
-  ORDER BY p.nombres, p.apellido_paterno;
-END$$
-DELIMITER ;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;
