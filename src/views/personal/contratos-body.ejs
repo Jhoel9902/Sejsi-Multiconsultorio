@@ -1,0 +1,117 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <h5 class="card-title mb-0"><i class="bi bi-file-earmark-pdf me-2"></i>Contratos de Personal</h5>
+        </div>
+
+        <!-- Alertas -->
+        <% if (error && error.trim() !== '') { %>
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle me-2"></i><strong>Error:</strong> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        <% } %>
+
+        <!-- Tabla de Contratos -->
+        <div class="card">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-table me-2"></i>Listado de Contratos</h6>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="fw-semibold">Personal</th>
+                    <th class="fw-semibold">C.I.</th>
+                    <th class="fw-semibold">Cargo</th>
+                    <th class="fw-semibold">Fecha Contratación</th>
+                    <th class="fw-semibold">Contrato</th>
+                    <th class="fw-semibold text-center">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% personalContratos.forEach(p => { %>
+                    <tr>
+                      <td>
+                        <strong><%= p.nombre_completo %></strong>
+                      </td>
+                      <td><%= p.ci %></td>
+                      <td>
+                        <span class="badge bg-light text-dark"><%= p.cargo %></span>
+                      </td>
+                      <td>
+                        <small class="text-muted"><%= new Date(p.fecha_contratacion).toLocaleDateString('es-ES') %></small>
+                      </td>
+                      <td>
+                        <% if (p.archivo_contrato) { %>
+                          <span class="badge bg-success">
+                            <i class="bi bi-file-pdf me-1"></i>Subido
+                          </span>
+                        <% } else { %>
+                          <span class="badge bg-secondary">
+                            <i class="bi bi-dash-circle me-1"></i>Sin archivo
+                          </span>
+                        <% } %>
+                      </td>
+                      <td class="text-center">
+                        <% if (p.archivo_contrato) { %>
+                          <a href="<%= p.archivo_contrato %>" class="btn btn-sm btn-primary" download target="_blank" title="Descargar contrato">
+                            <i class="bi bi-download"></i>
+                          </a>
+                        <% } else { %>
+                          <button class="btn btn-sm btn-secondary" disabled title="Sin contrato">
+                            <i class="bi bi-download"></i>
+                          </button>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }); %>
+                  
+                  <% if (personalContratos.length === 0) { %>
+                    <tr>
+                      <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>No hay personal registrado
+                      </td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="row mt-4">
+          <div class="col-md-4">
+            <div class="card bg-light">
+              <div class="card-body text-center">
+                <h6 class="card-title"><i class="bi bi-people me-2"></i>Total Personal</h6>
+                <h4 class="mb-0"><%= personalContratos.length %></h4>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card bg-light">
+              <div class="card-body text-center">
+                <h6 class="card-title"><i class="bi bi-check-circle me-2"></i>Con Contrato</h6>
+                <h4 class="mb-0"><%= personalContratos.filter(p => p.archivo_contrato).length %></h4>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card bg-light">
+              <div class="card-body text-center">
+                <h6 class="card-title"><i class="bi bi-exclamation-circle me-2"></i>Sin Contrato</h6>
+                <h4 class="mb-0"><%= personalContratos.filter(p => !p.archivo_contrato).length %></h4>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

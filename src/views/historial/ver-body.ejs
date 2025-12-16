@@ -1,0 +1,258 @@
+<!-- DETALLES DEL HISTORIAL MÉDICO -->
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-lg-12">
+            <!-- Encabezado -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0"><i class="bi bi-file-medical me-2"></i>Detalles del Historial</h4>
+                    <a href="/historial/consultar" class="btn btn-light btn-sm">
+                        <i class="bi bi-arrow-left"></i> Volver
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Paciente:</strong> <%= historial.nombre_paciente %></p>
+                            <p class="mb-2"><strong>C.I.:</strong> <%= historial.ci %></p>
+                            <p class="mb-2"><strong>Tipo de Sangre:</strong> <%= historial.tipo_sangre || 'N/A' %></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-2"><strong>Médico:</strong> <%= historial.nombre_medico %></p>
+                            <p class="mb-2"><strong>Fecha Cita:</strong> <%= new Date(historial.fecha_cita).toLocaleDateString('es-ES') %><% if (historial.hora_cita) { %> a las <%= typeof historial.hora_cita === 'string' ? historial.hora_cita.substring(0, 5) : new Date(historial.hora_cita).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) %><% } %></p>
+                            <p class="mb-2"><strong>Fecha Registro:</strong> <%= new Date(historial.fecha_creacion).toLocaleDateString('es-ES') %></p>
+                        </div>
+                    </div>
+                    <% if (historial.alergias) { %>
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <strong><i class="bi bi-exclamation-triangle me-2"></i>Alergias:</strong> <%= historial.alergias %>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Información Médica -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>Información Médica</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="formEditar">
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Diagnósticos</strong></label>
+                                    <textarea class="form-control" id="diagnosticos" rows="3" readonly><%= historial.diagnosticos || '' %></textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Evoluciones</strong></label>
+                                    <textarea class="form-control" id="evoluciones" rows="3" readonly><%= historial.evoluciones || '' %></textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Antecedentes</strong></label>
+                                    <textarea class="form-control" id="antecedentes" rows="3" readonly><%= historial.antecedentes || '' %></textarea>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Tratamientos</strong></label>
+                                    <textarea class="form-control" id="tratamientos" rows="3" readonly><%= historial.tratamientos || '' %></textarea>
+                                </div>
+
+                                <button type="button" class="btn btn-warning" id="btnEditar">
+                                    <i class="bi bi-pencil me-2"></i>Editar
+                                </button>
+                                <button type="submit" class="btn btn-success" id="btnGuardar" style="display: none;">
+                                    <i class="bi bi-check-circle me-2"></i>Guardar Cambios
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="btnCancelar" style="display: none;">
+                                    <i class="bi bi-x-circle me-2"></i>Cancelar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estudios -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-images me-2"></i>Estudios e Imágenes</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Formulario de carga -->
+                            <div class="mb-4">
+                                <h6 class="mb-3">Agregar Nuevo Estudio</h6>
+                                <form id="formSubirEstudio">
+                                    <div class="mb-2">
+                                        <label for="nombreEstudio" class="form-label">Nombre del Estudio</label>
+                                        <input type="text" class="form-control" id="nombreEstudio" placeholder="Ej: Radiografía Tórax" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label for="archivoEstudio" class="form-label">Archivo (Imagen/PDF)</label>
+                                        <input type="file" class="form-control" id="archivoEstudio" accept="image/*,.pdf" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success btn-sm w-100">
+                                        <i class="bi bi-cloud-upload me-2"></i>Subir Estudio
+                                    </button>
+                                </form>
+                            </div>
+
+                            <hr>
+
+                            <!-- Lista de estudios -->
+                            <h6 class="mb-3">Estudios Cargados</h6>
+                            <div id="listaEstudios">
+                                <% if (estudios && estudios.length > 0) { %>
+                                    <% estudios.forEach(estudio => { %>
+                                        <div class="card mb-2" data-id="<%= estudio.id_estudio %>">
+                                            <div class="card-body p-2">
+                                                <p class="card-title mb-1" style="font-size: 0.9rem;">
+                                                    <strong><%= estudio.nombre_estudio %></strong>
+                                                </p>
+                                                <small class="text-muted d-block mb-2">
+                                                    <%= new Date(estudio.fecha_subida).toLocaleDateString('es-ES') %>
+                                                </small>
+                                                <div class="btn-group btn-group-sm w-100">
+                                                    <a href="<%= estudio.foto %>" class="btn btn-info" target="_blank">
+                                                        <i class="bi bi-download"></i> Descargar
+                                                    </a>
+                                                    <button type="button" class="btn btn-danger" onclick="eliminarEstudio('<%= estudio.id_estudio %>')">
+                                                        <i class="bi bi-trash"></i> Eliminar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <% }); %>
+                                <% } else { %>
+                                    <div class="alert alert-secondary mb-0">
+                                        <small>No hay estudios cargados aún.</small>
+                                    </div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const idHistorial = '<%= historial.id_historial %>';
+
+// Editar modo
+document.getElementById('btnEditar').addEventListener('click', () => {
+    document.querySelectorAll('#formEditar textarea').forEach(el => el.removeAttribute('readonly'));
+    document.getElementById('btnEditar').style.display = 'none';
+    document.getElementById('btnGuardar').style.display = 'inline-block';
+    document.getElementById('btnCancelar').style.display = 'inline-block';
+});
+
+document.getElementById('btnCancelar').addEventListener('click', () => {
+    location.reload();
+});
+
+document.getElementById('formEditar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+    
+    try {
+        const response = await fetch(`/historial/${idHistorial}/actualizar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                diagnosticos: document.getElementById('diagnosticos').value,
+                evoluciones: document.getElementById('evoluciones').value,
+                antecedentes: document.getElementById('antecedentes').value,
+                tratamientos: document.getElementById('tratamientos').value
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Historial actualizado exitosamente');
+            location.reload();
+        } else {
+            alert('Error: ' + data.mensaje);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al actualizar');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Guardar Cambios';
+    }
+});
+
+// Subir estudio
+document.getElementById('formSubirEstudio').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const nombre = document.getElementById('nombreEstudio').value;
+    const archivo = document.getElementById('archivoEstudio').files[0];
+    
+    if (!archivo) {
+        alert('Selecciona un archivo');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('nombre_estudio', nombre);
+    formData.append('archivo_estudio', archivo);
+    
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Subiendo...';
+    
+    try {
+        const response = await fetch(`/historial/${idHistorial}/estudios`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Estudio cargado exitosamente');
+            location.reload();
+        } else {
+            alert('Error: ' + data.mensaje);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al subir estudio');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-upload me-2"></i>Subir Estudio';
+    }
+});
+
+// Eliminar estudio
+async function eliminarEstudio(idEstudio) {
+    if (!confirm('¿Eliminar este estudio?')) return;
+    
+    try {
+        const response = await fetch(`/historial/${idHistorial}/estudios/${idEstudio}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.querySelector(`[data-id="${idEstudio}"]`).remove();
+            alert('Estudio eliminado');
+        } else {
+            alert('Error: ' + data.mensaje);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al eliminar');
+    }
+}
+</script>

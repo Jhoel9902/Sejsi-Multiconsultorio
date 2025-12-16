@@ -287,4 +287,131 @@ router.post('/horarios/cambiar-dia-descanso', requireAuth, requireRole(['admin']
   }
 });
 
+// GET /horarios/consultar - Consultar horarios de todo el personal (admin)
+router.get('/horarios/consultar', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const [personalHorarios] = await pool.query(`
+      SELECT 
+        p.id_personal,
+        CONCAT(p.nombres, ' ', p.apellido_paterno, ' ', COALESCE(p.apellido_materno, '')) AS nombre_completo,
+        p.ci,
+        p.celular,
+        h.id_horario,
+        h.dia_semana,
+        CASE h.dia_semana
+          WHEN 1 THEN 'Lunes'
+          WHEN 2 THEN 'Martes'
+          WHEN 3 THEN 'Miércoles'
+          WHEN 4 THEN 'Jueves'
+          WHEN 5 THEN 'Viernes'
+          WHEN 6 THEN 'Sábado'
+          WHEN 7 THEN 'Domingo'
+        END AS nombre_dia,
+        CONCAT(DATE_FORMAT(h.hora_inicio, '%H:%i'), ' - ', DATE_FORMAT(h.hora_fin, '%H:%i')) AS rango_horas,
+        h.descripcion,
+        ph.dia_descanso,
+        ph.estado,
+        CASE 
+          WHEN ph.estado = 1 THEN 'Disponible'
+          WHEN ph.estado = 0 THEN 'Bloqueado'
+        END AS estado_label
+      FROM tpersonal p
+      LEFT JOIN tpersonal_horario ph ON p.id_personal = ph.id_personal
+      LEFT JOIN thorario h ON ph.id_horario = h.id_horario
+      WHERE p.estado = 1
+      ORDER BY p.nombres, p.apellido_paterno, h.dia_semana, h.hora_inicio
+    `);
+
+    res.render('horarios/consultar', { 
+      user: req.user, 
+      personalHorarios: personalHorarios || [],
+      error: null
+    });
+  } catch (err) {
+    res.status(500).render('horarios/consultar', { 
+      user: req.user, 
+      personalHorarios: [],
+      error: 'Error al cargar horarios.'
+    });
+  }
+});
+
+// GET /horarios/disponibilidad - Ver disponibilidad de médicos (ventanilla)
+router.get('/horarios/disponibilidad', requireAuth, requireRole(['ventanilla', 'admin']), async (req, res) => {
+  try {
+    // Obtener día actual (1=Lunes, 7=Domingo en MySQL DAYOFWEEK retorna 1=Domingo)
+    const [currentDay] = await pool.query(`
+      SELECT CASE DAYOFWEEK(CURDATE())
+        WHEN 1 THEN 7
+        WHEN 2 THEN 1
+        WHEN 3 THEN 2
+        WHEN 4 THEN 3
+        WHEN 5 THEN 4
+        WHEN 6 THEN 5
+        WHEN 7 THEN 6
+      END AS dia_actual
+    `);
+    const diaActual = currentDay[0].dia_actual;
+
+    // Obtener disponibilidad de médicos para hoy y próximos días
+    const [disponibilidad] = await pool.query(`
+      SELECT 
+        p.id_personal,
+        CONCAT(p.nombres, ' ', p.apellido_paterno, ' ', COALESCE(p.apellido_materno, '')) AS nombre_completo,
+        p.foto_perfil,
+        h.id_horario,
+        h.dia_semana,
+        CASE h.dia_semana
+          WHEN 1 THEN 'Lunes'
+          WHEN 2 THEN 'Martes'
+          WHEN 3 THEN 'Miércoles'
+          WHEN 4 THEN 'Jueves'
+          WHEN 5 THEN 'Viernes'
+          WHEN 6 THEN 'Sábado'
+          WHEN 7 THEN 'Domingo'
+        END AS nombre_dia,
+        CONCAT(DATE_FORMAT(h.hora_inicio, '%H:%i'), ' - ', DATE_FORMAT(h.hora_fin, '%H:%i')) AS rango_horas,
+        h.descripcion,
+        ph.dia_descanso,
+        ph.estado,
+        CASE 
+          WHEN ph.estado = 1 THEN 'Disponible'
+          WHEN ph.estado = 0 THEN 'Bloqueado'
+          ELSE 'Sin asignar'
+        END AS estado_label,
+        CASE 
+          WHEN ph.dia_descanso = CASE h.dia_semana
+            WHEN 1 THEN 'Lunes'
+            WHEN 2 THEN 'Martes'
+            WHEN 3 THEN 'Miércoles'
+            WHEN 4 THEN 'Jueves'
+            WHEN 5 THEN 'Viernes'
+            WHEN 6 THEN 'Sábado'
+            WHEN 7 THEN 'Domingo'
+          END THEN 1
+          ELSE 0
+        END AS es_dia_descanso
+      FROM tpersonal p
+      LEFT JOIN tpersonal_horario ph ON p.id_personal = ph.id_personal
+      LEFT JOIN thorario h ON ph.id_horario = h.id_horario
+      WHERE p.estado = 1 AND (ph.estado IS NULL OR ph.estado = 1)
+      ORDER BY p.nombres, p.apellido_paterno, h.dia_semana, h.hora_inicio
+    `);
+
+    res.render('horarios/disponibilidad', { 
+      user: req.user, 
+      disponibilidad: disponibilidad || [],
+      diaActual: diaActual,
+      error: null
+    });
+  } catch (err) {
+    res.status(500).render('horarios/disponibilidad', { 
+      user: req.user, 
+      disponibilidad: [],
+      diaActual: null,
+      error: 'Error al cargar disponibilidad.'
+    });
+  }
+});
+
 export default router;

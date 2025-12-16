@@ -1,0 +1,116 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <h5 class="card-title mb-0"><i class="bi bi-calendar2-check me-2"></i>Consultar Horarios de Personal</h5>
+        </div>
+
+        <!-- Alertas -->
+        <% if (error && error.trim() !== '') { %>
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle me-2"></i><strong>Error:</strong> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        <% } %>
+
+        <!-- Tabla de horarios por personal -->
+        <div class="card">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-table me-2"></i>Horarios Asignados</h6>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-sm align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th class="fw-semibold">Personal</th>
+                    <th class="fw-semibold">C.I.</th>
+                    <th class="fw-semibold">Celular</th>
+                    <th class="fw-semibold">Día</th>
+                    <th class="fw-semibold">Horario</th>
+                    <th class="fw-semibold">Descripción</th>
+                    <th class="fw-semibold">Descanso</th>
+                    <th class="fw-semibold text-center">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% 
+                    let personalActual = '';
+                    personalHorarios.forEach((h, index) => {
+                      const esPrimerRegistro = personalActual !== h.id_personal;
+                      personalActual = h.id_personal;
+                      
+                      const badge = h.estado === 1 ? 'bg-success' : (h.estado === 0 ? 'bg-warning' : 'bg-secondary');
+                      const tieneHorarios = h.id_horario !== null;
+                  %>
+                    <tr>
+                      <% if (esPrimerRegistro) { %>
+                        <td>
+                          <strong><%= h.nombre_completo %></strong>
+                        </td>
+                        <td><%= h.ci %></td>
+                        <td><small class="text-muted"><%= h.celular || '-' %></small></td>
+                      <% } else { %>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                      <% } %>
+                      
+                      <% if (tieneHorarios) { %>
+                        <td><strong><%= h.nombre_dia %></strong></td>
+                        <td><%= h.rango_horas %></td>
+                        <td><small><%= h.descripcion %></small></td>
+                        <td><strong><%= h.dia_descanso %></strong></td>
+                        <td class="text-center"><span class="badge <%= badge %>"><%= h.estado_label %></span></td>
+                      <% } else { %>
+                        <td colspan="5" class="text-muted"><em>Sin horarios asignados</em></td>
+                      <% } %>
+                    </tr>
+                  <% }); %>
+                  
+                  <% if (personalHorarios.length === 0) { %>
+                    <tr>
+                      <td colspan="8" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>No hay horarios registrados
+                      </td>
+                    </tr>
+                  <% } %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="row mt-4">
+          <div class="col-md-4">
+            <div class="card bg-light">
+              <div class="card-body text-center">
+                <h6 class="card-title"><i class="bi bi-people me-2"></i>Total Personal</h6>
+                <h4 class="mb-0"><%= personalHorarios.filter((v, i, a) => a.findIndex(t => t.id_personal === v.id_personal) === i).length %></h4>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card bg-light">
+              <div class="card-body text-center">
+                <h6 class="card-title"><i class="bi bi-check-circle me-2"></i>Horarios Disponibles</h6>
+                <h4 class="mb-0"><%= personalHorarios.filter(h => h.estado === 1).length %></h4>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card bg-light">
+              <div class="card-body text-center">
+                <h6 class="card-title"><i class="bi bi-exclamation-circle me-2"></i>Bloqueados</h6>
+                <h4 class="mb-0"><%= personalHorarios.filter(h => h.estado === 0).length %></h4>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

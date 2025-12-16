@@ -298,6 +298,20 @@
             <a class="nav-link active" href="/dashboard"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
             <a class="nav-link" href="/pacientes"><i class="bi bi-people me-2"></i>Pacientes</a>
             
+            <!-- Menú Historial Médico (solo médico) -->
+            <% if (user && user.nombre_rol === 'medico') { %>
+              <a class="nav-link" href="#historialMenu" data-bs-toggle="collapse" role="button" aria-expanded="false">
+                <i class="bi bi-file-medical me-2"></i>Historial
+                <i class="bi bi-chevron-down ms-auto"></i>
+              </a>
+              <div class="collapse ms-3" id="historialMenu">
+                <nav class="nav flex-column gap-1">
+                  <a class="nav-link small" href="/historial/agregar"><i class="bi bi-plus-circle me-2"></i>Agregar</a>
+                  <a class="nav-link small" href="/historial/consultar"><i class="bi bi-search me-2"></i>Consultar</a>
+                </nav>
+              </div>
+            <% } %>
+            
             <!-- Menú Mi Perfil (todos los usuarios) -->
             <a class="nav-link" href="#" onclick="abrirPerfilUsuario(); return false;">
               <i class="bi bi-person-circle me-2"></i>Mi Perfil
@@ -314,14 +328,27 @@
                   <a class="nav-link small" href="/personal/registrar"><i class="bi bi-person-plus me-2"></i>Registrar</a>
                   <a class="nav-link small" href="/personal/gestionar"><i class="bi bi-person-gear me-2"></i>Gestionar</a>
                   <a class="nav-link small" href="/personal/medicos"><i class="bi bi-heart-pulse me-2"></i>Médicos</a>
-                  <a class="nav-link small" href="/horarios/gestionar"><i class="bi bi-clock me-2"></i>Horarios</a>
-                  <a class="nav-link small" href="#"><i class="bi bi-file-text me-2"></i>Contratos</a>
+                  <a class="nav-link small" href="#horariosMenu" data-bs-toggle="collapse" role="button" aria-expanded="false">
+                    <i class="bi bi-clock me-2"></i>Horarios
+                    <i class="bi bi-chevron-down ms-auto"></i>
+                  </a>
+                  <div class="collapse ms-3" id="horariosMenu">
+                    <nav class="nav flex-column gap-1">
+                      <a class="nav-link small" href="/horarios/gestionar"><i class="bi bi-pencil-square me-2"></i>Definir</a>
+                      <a class="nav-link small" href="/horarios/consultar"><i class="bi bi-search me-2"></i>Consultar</a>
+                    </nav>
+                  </div>
+                  <a class="nav-link small" href="/personal/contratos"><i class="bi bi-file-text me-2"></i>Contratos</a>
                 </nav>
               </div>
             <% } else if (user && user.nombre_rol === 'ventanilla') { %>
               <!-- Médicos para ventanilla (sin submenu) -->
               <a class="nav-link" href="/personal/medicos">
                 <i class="bi bi-heart-pulse me-2"></i>Médicos
+              </a>
+              <!-- Disponibilidad para ventanilla -->
+              <a class="nav-link" href="/horarios/disponibilidad">
+                <i class="bi bi-clock-history me-2"></i>Disponibilidad Médicos
               </a>
             <% } %>
 

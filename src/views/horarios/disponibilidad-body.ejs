@@ -1,0 +1,177 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <!-- Header -->
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <h5 class="card-title mb-0"><i class="bi bi-clock-history me-2"></i>Disponibilidad de Médicos</h5>
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Actualizar
+          </button>
+        </div>
+
+        <!-- Alertas -->
+        <% if (error && error.trim() !== '') { %>
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-circle me-2"></i><strong>Error:</strong> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        <% } %>
+
+        <!-- Información de ayuda -->
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle me-2"></i>
+          <strong>Leyenda:</strong> 
+          <span class="badge bg-success ms-2">Disponible</span> = Médico disponible para citas
+          <span class="badge bg-warning text-dark ms-2">Bloqueado</span> = Médico no disponible
+        </div>
+
+        <!-- Tarjetas por médico -->
+        <div class="row" id="medicosContainer">
+          <% 
+            // Agrupar por personal
+            const medicos = {};
+            disponibilidad.forEach(d => {
+              if (!medicos[d.id_personal]) {
+                medicos[d.id_personal] = {
+                  nombre: d.nombre_completo,
+                  foto: d.foto_perfil,
+                  horarios: []
+                };
+              }
+              if (d.id_horario) {
+                medicos[d.id_personal].horarios.push(d);
+              }
+            });
+
+            Object.entries(medicos).forEach(([idPersonal, medico]) => {
+          %>
+            <div class="col-lg-6 mb-3">
+              <div class="card h-100 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                  <div class="d-flex align-items-center gap-2">
+                    <% if (medico.foto) { %>
+                      <img src="<%= medico.foto %>" alt="<%= medico.nombre %>" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                    <% } else { %>
+                      <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="bi bi-person-fill text-primary"></i>
+                      </div>
+                    <% } %>
+                    <div class="flex-grow-1">
+                      <h6 class="mb-0"><%= medico.nombre %></h6>
+                    </div>
+                  </div>
+                </div>
+                <div class="card-body p-3">
+                  <% if (medico.horarios.length > 0) { %>
+                    <div class="list-group list-group-sm">
+                      <% medico.horarios.forEach(h => { %>
+                        <div class="list-group-item px-2 py-2">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                              <strong class="d-block"><%= h.nombre_dia %></strong>
+                              <small class="text-muted"><%= h.rango_horas %></small>
+                              <% if (h.descripcion) { %>
+                                <br><small class="text-muted">📝 <%= h.descripcion %></small>
+                              <% } %>
+                              <% if (h.es_dia_descanso) { %>
+                                <br><small class="text-danger">⛔ Día de descanso</small>
+                              <% } %>
+                            </div>
+                            <div class="text-end ms-2">
+                              <% if (h.estado === 1 && !h.es_dia_descanso) { %>
+                                <span class="badge bg-success rounded-pill">Disponible</span>
+                              <% } else if (h.estado === 0) { %>
+                                <span class="badge bg-warning rounded-pill text-dark">Bloqueado</span>
+                              <% } else { %>
+                                <span class="badge bg-secondary rounded-pill">Sin info</span>
+                              <% } %>
+                            </div>
+                          </div>
+                        </div>
+                      <% }); %>
+                    </div>
+                  <% } else { %>
+                    <div class="alert alert-warning mb-0">
+                      <i class="bi bi-exclamation-triangle me-2"></i>
+                      <small>Sin horarios asignados</small>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+
+          <% if (Object.keys(medicos).length === 0) { %>
+            <div class="col-12">
+              <div class="alert alert-info text-center">
+                <i class="bi bi-inbox me-2"></i>
+                No hay médicos registrados en el sistema
+              </div>
+            </div>
+          <% } %>
+        </div>
+
+        <!-- Vista de Tabla alternativa -->
+        <div class="mt-5">
+          <h6 class="mb-3"><i class="bi bi-table me-2"></i>Vista Detallada</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="fw-semibold">Médico</th>
+                  <th class="fw-semibold">Día</th>
+                  <th class="fw-semibold">Horario</th>
+                  <th class="fw-semibold">Descripción</th>
+                  <th class="fw-semibold text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% disponibilidad.forEach(d => { %>
+                  <% if (d.id_horario) { %>
+                    <tr>
+                      <td>
+                        <strong><%= d.nombre_completo %></strong>
+                      </td>
+                      <td><strong><%= d.nombre_dia %></strong></td>
+                      <td><%= d.rango_horas %></td>
+                      <td>
+                        <% if (d.descripcion) { %>
+                          <small><%= d.descripcion %></small>
+                        <% } else { %>
+                          <small class="text-muted">-</small>
+                        <% } %>
+                        <% if (d.es_dia_descanso) { %>
+                          <br><small class="text-danger">⛔ Día de descanso</small>
+                        <% } %>
+                      </td>
+                      <td class="text-center">
+                        <% if (d.estado === 1 && !d.es_dia_descanso) { %>
+                          <span class="badge bg-success">Disponible</span>
+                        <% } else if (d.estado === 0) { %>
+                          <span class="badge bg-warning text-dark">Bloqueado</span>
+                        <% } else if (d.es_dia_descanso) { %>
+                          <span class="badge bg-secondary">Descanso</span>
+                        <% } else { %>
+                          <span class="badge bg-secondary">Sin info</span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% } %>
+                <% }); %>
+                
+                <% if (disponibilidad.filter(d => d.id_horario).length === 0) { %>
+                  <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                      <i class="bi bi-inbox me-2"></i>No hay horarios disponibles
+                    </td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

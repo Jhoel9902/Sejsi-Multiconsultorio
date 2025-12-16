@@ -538,4 +538,38 @@ router.get('/personal/mi-perfil', requireAuth, async (req, res) => {
   }
 });
 
+// GET /personal/contratos - Ver contratos de todo el personal (admin)
+router.get('/personal/contratos', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const [personalContratos] = await pool.query(`
+      SELECT 
+        id_personal,
+        CONCAT(nombres, ' ', apellido_paterno, ' ', COALESCE(apellido_materno, '')) AS nombre_completo,
+        ci,
+        cargo,
+        fecha_contratacion,
+        fecha_actualizacion,
+        archivo_contrato,
+        estado,
+        CASE WHEN estado = 1 THEN 'Activo' ELSE 'Inactivo' END AS estado_label
+      FROM tpersonal
+      WHERE estado = 1
+      ORDER BY nombres, apellido_paterno
+    `);
+
+    res.render('personal/contratos', { 
+      user: req.user, 
+      personalContratos: personalContratos || [],
+      error: null
+    });
+  } catch (err) {
+    console.error('Error fetching contracts', err);
+    res.status(500).render('personal/contratos', { 
+      user: req.user, 
+      personalContratos: [],
+      error: 'Error al cargar los contratos.'
+    });
+  }
+});
+
 export default router;

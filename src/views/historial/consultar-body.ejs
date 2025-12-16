@@ -1,0 +1,199 @@
+<!-- CONSULTAR HISTORIAL MÉDICO -->
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0"><i class="bi bi-search me-2"></i>Consultar Historial Médico</h4>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Búsqueda de Paciente -->
+                    <div class="mb-4">
+                        <h5 class="mb-3">Buscar Paciente</h5>
+                        <div class="input-group input-group-lg">
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="searchPaciente2" 
+                                   placeholder="Buscar por nombre, CI...">
+                            <button class="btn btn-info" type="button" id="btnBuscar">
+                                <i class="bi bi-search"></i> Buscar
+                            </button>
+                        </div>
+                        
+                        <!-- Dropdown de resultados -->
+                        <div id="pacienteResultados2" class="list-group mt-2" style="display: none; max-height: 300px; overflow-y: auto; position: absolute; width: 50%; z-index: 1000;"></div>
+                    </div>
+
+                    <!-- Información del paciente seleccionado -->
+                    <div id="pacienteInfo" style="display: none;" class="mb-4">
+                        <div class="alert alert-info">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5 id="nombrePaciente2"></h5>
+                                    <p class="mb-1"><strong>C.I.:</strong> <span id="ciPaciente2"></span></p>
+                                    <p class="mb-1"><strong>Tipo Sangre:</strong> <span id="sangrePaciente2"></span></p>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <button class="btn btn-sm btn-secondary" onclick="limpiarBusqueda2()">
+                                        <i class="bi bi-x"></i> Limpiar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de historiales -->
+                    <div id="historialesContainer" style="display: none;">
+                        <h5 class="mb-3">Historiales Médicos</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Hora</th>
+                                        <th>Médico</th>
+                                        <th>Motivo Consulta</th>
+                                        <th>Diagnóstico (preview)</th>
+                                        <th>Estudios</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaPrincipal"></tbody>
+                            </table>
+                        </div>
+
+                        <div id="historialesVacios" class="alert alert-warning" style="display: none;">
+                            <i class="bi bi-info-circle me-2"></i> Este paciente no tiene historiales registrados.
+                        </div>
+                    </div>
+
+                    <div id="noResultados" class="alert alert-secondary" style="display: none;">
+                        <i class="bi bi-search me-2"></i> Selecciona un paciente para ver sus historiales.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let idPacienteActual = null;
+
+// Función para realizar la búsqueda
+async function realizarBusqueda() {
+    const query = document.getElementById('searchPaciente2').value.trim();
+    const resultados = document.getElementById('pacienteResultados2');
+    
+    if (query.length === 0) {
+        resultados.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/historial/buscar-paciente?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data.length === 0) {
+            resultados.innerHTML = '<div class="list-group-item">No hay resultados</div>';
+            resultados.style.display = 'block';
+            return;
+        }
+        
+        resultados.innerHTML = data.map(p => `
+            <button type="button" class="list-group-item list-group-item-action" onclick="seleccionarPaciente2('${p.id_paciente}', '${p.nombre_completo}', '${p.ci}', '${p.tipo_sangre || 'N/A'}')">
+                <strong>${p.nombre_completo}</strong><br>
+                <small>C.I.: ${p.ci}</small>
+            </button>
+        `).join('');
+        resultados.style.display = 'block';
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error en la búsqueda');
+    }
+}
+
+// Evento en input: busca mientras se escribe
+document.getElementById('searchPaciente2').addEventListener('input', realizarBusqueda);
+
+// Evento en Enter en el input
+document.getElementById('searchPaciente2').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        realizarBusqueda();
+    }
+});
+
+// Evento en botón buscar
+document.getElementById('btnBuscar').addEventListener('click', (e) => {
+    e.preventDefault();
+    realizarBusqueda();
+});
+
+function seleccionarPaciente2(id, nombre, ci, sangre) {
+    idPacienteActual = id;
+    
+    document.getElementById('searchPaciente2').value = nombre;
+    document.getElementById('pacienteResultados2').style.display = 'none';
+    
+    document.getElementById('nombrePaciente2').textContent = nombre;
+    document.getElementById('ciPaciente2').textContent = ci;
+    document.getElementById('sangrePaciente2').textContent = sangre;
+    
+    document.getElementById('pacienteInfo').style.display = 'block';
+    document.getElementById('noResultados').style.display = 'none';
+    
+    cargarHistoriales(id);
+}
+
+async function cargarHistoriales(idPaciente) {
+    try {
+        const response = await fetch(`/historial/${idPaciente}/listar`);
+        const historiales = await response.json();
+        
+        if (historiales.length === 0) {
+            document.getElementById('historialesContainer').style.display = 'block';
+            document.getElementById('tablaPrincipal').innerHTML = '';
+            document.getElementById('historialesVacios').style.display = 'block';
+            return;
+        }
+        
+        document.getElementById('historialesVacios').style.display = 'none';
+        document.getElementById('historialesContainer').style.display = 'block';
+        
+        document.getElementById('tablaPrincipal').innerHTML = historiales.map(h => `
+            <tr>
+                <td><small>${new Date(h.fecha_cita).toLocaleDateString('es-ES')}</small></td>
+                <td><small>${h.hora_cita ? (typeof h.hora_cita === 'string' ? h.hora_cita.substring(0, 5) : new Date(h.hora_cita).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })) : 'N/A'}</small></td>
+                <td>${h.nombre_medico || 'N/A'}</td>
+                <td><small>${h.motivo_consulta || 'N/A'}</small></td>
+                <td><small>${(h.diagnosticos || '').substring(0, 50)}...</small></td>
+                <td>
+                    <span class="badge ${h.cantidad_estudios > 0 ? 'bg-success' : 'bg-secondary'}">
+                        ${h.cantidad_estudios || 0} estudio(s)
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="verHistorial('${h.id_historial}')">
+                        <i class="bi bi-eye"></i> Ver
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar historiales');
+    }
+}
+
+function limpiarBusqueda2() {
+    document.getElementById('searchPaciente2').value = '';
+    document.getElementById('pacienteInfo').style.display = 'none';
+    document.getElementById('historialesContainer').style.display = 'none';
+    document.getElementById('noResultados').style.display = 'block';
+    idPacienteActual = null;
+}
+
+function verHistorial(idHistorial) {
+    window.location.href = `/historial/ver/${idHistorial}`;
+}
+</script>
