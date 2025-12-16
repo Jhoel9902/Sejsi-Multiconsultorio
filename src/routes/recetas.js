@@ -4,8 +4,8 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /historial/:id_historial/recetas - Listar recetas de un historial
-router.get('/historial/:id_historial/recetas', requireAuth, requireRole(['medico']), async (req, res) => {
+// GET /:id_historial/recetas - Listar recetas de un historial
+router.get('/:id_historial/recetas', requireAuth, requireRole(['medico']), async (req, res) => {
     try {
         const { id_historial } = req.params;
 
@@ -21,17 +21,17 @@ router.get('/historial/:id_historial/recetas', requireAuth, requireRole(['medico
     }
 });
 
-// POST /historial/:id_historial/recetas - Crear nueva receta
-router.post('/historial/:id_historial/recetas', requireAuth, requireRole(['medico']), async (req, res) => {
+// POST /:id_historial/recetas - Crear nueva receta
+router.post('/:id_historial/recetas', requireAuth, requireRole(['medico']), async (req, res) => {
     try {
         const { id_historial } = req.params;
-        const { id_cita, medicamentos, dosis, frecuencia, duracion, observaciones } = req.body;
+        const { medicamento_nombre, presentacion, dosis, frecuencia, duracion, indicaciones } = req.body;
 
         // Validaciones
         const errors = [];
 
-        if (!medicamentos || medicamentos.trim() === '') {
-            errors.push('Los medicamentos son obligatorios.');
+        if (!medicamento_nombre || medicamento_nombre.trim() === '') {
+            errors.push('El medicamento es obligatorio.');
         }
 
         // Validar dosis: números + unidades (ej: 500 mg, 2.5 ml)
@@ -49,7 +49,7 @@ router.post('/historial/:id_historial/recetas', requireAuth, requireRole(['medic
         // Crear receta
         await pool.query(
             'CALL sp_receta_crear(?, ?, ?, ?, ?, ?, ?, ?, @p_success, @p_msg, @p_id_receta)',
-            [id_historial, id_cita || null, req.user.id_personal, medicamentos, dosis || null, frecuencia || null, duracion || null, observaciones || null]
+            [id_historial, req.user.id_personal, medicamento_nombre, presentacion || null, dosis || null, frecuencia || null, duracion || null, indicaciones || null]
         );
 
         const [[result]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje, @p_id_receta AS id_receta');
@@ -65,8 +65,8 @@ router.post('/historial/:id_historial/recetas', requireAuth, requireRole(['medic
     }
 });
 
-// GET /historial/recetas/:id_receta - Obtener detalles de receta
-router.get('/historial/recetas/:id_receta', requireAuth, requireRole(['medico']), async (req, res) => {
+// GET /recetas/:id_receta - Obtener detalles de receta
+router.get('/recetas/:id_receta', requireAuth, requireRole(['medico']), async (req, res) => {
     try {
         const { id_receta } = req.params;
 
@@ -88,17 +88,17 @@ router.get('/historial/recetas/:id_receta', requireAuth, requireRole(['medico'])
     }
 });
 
-// POST /historial/recetas/:id_receta - Actualizar receta
-router.post('/historial/recetas/:id_receta', requireAuth, requireRole(['medico']), async (req, res) => {
+// POST /recetas/:id_receta - Actualizar receta
+router.post('/recetas/:id_receta', requireAuth, requireRole(['medico']), async (req, res) => {
     try {
         const { id_receta } = req.params;
-        const { medicamentos, dosis, frecuencia, duracion, observaciones } = req.body;
+        const { medicamento_nombre, presentacion, dosis, frecuencia, duracion, indicaciones } = req.body;
 
         // Validaciones
         const errors = [];
 
-        if (!medicamentos || medicamentos.trim() === '') {
-            errors.push('Los medicamentos son obligatorios.');
+        if (!medicamento_nombre || medicamento_nombre.trim() === '') {
+            errors.push('El medicamento es obligatorio.');
         }
 
         // Validar dosis: números + unidades (ej: 500 mg, 2.5 ml)
@@ -115,8 +115,8 @@ router.post('/historial/recetas/:id_receta', requireAuth, requireRole(['medico']
 
         // Actualizar receta
         await pool.query(
-            'CALL sp_receta_actualizar(?, ?, ?, ?, ?, ?, @p_success, @p_msg)',
-            [id_receta, medicamentos, dosis || null, frecuencia || null, duracion || null, observaciones || null]
+            'CALL sp_receta_actualizar(?, ?, ?, ?, ?, ?, ?, @p_success, @p_msg)',
+            [id_receta, medicamento_nombre, presentacion || null, dosis || null, frecuencia || null, duracion || null, indicaciones || null]
         );
 
         const [[result]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje');
@@ -132,8 +132,8 @@ router.post('/historial/recetas/:id_receta', requireAuth, requireRole(['medico']
     }
 });
 
-// POST /historial/recetas/:id_receta/eliminar - Eliminar receta
-router.post('/historial/recetas/:id_receta/eliminar', requireAuth, requireRole(['medico']), async (req, res) => {
+// POST /recetas/:id_receta/eliminar - Eliminar receta
+router.post('/recetas/:id_receta/eliminar', requireAuth, requireRole(['medico']), async (req, res) => {
     try {
         const { id_receta } = req.params;
 

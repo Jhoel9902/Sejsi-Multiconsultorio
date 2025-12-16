@@ -67,7 +67,7 @@ app.use(especialidadesRouter);
 app.use(aseguradoresRouter);
 app.use(horariosRouter);
 app.use('/historial', historialRouter);
-app.use('/historial', recetasRouter);
+app.use('/historial', recetasRouter);  // Routes in recetas.js start with / (without /historial)
 app.use(serviciosRouter);
 
 // 404 - Página no encontrada

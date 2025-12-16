@@ -148,8 +148,12 @@
                         <form id="formAgregarReceta">
                             <div class="row">
                                 <div class="col-md-12 mb-2">
-                                    <label for="medicamentos" class="form-label">Medicamentos *</label>
-                                    <textarea class="form-control" id="medicamentos" placeholder="Ej: Paracetamol, Amoxicilina 500mg" required></textarea>
+                                    <label for="medicamento_nombre" class="form-label">Medicamento *</label>
+                                    <input type="text" class="form-control" id="medicamento_nombre" placeholder="Ej: Paracetamol" required>
+                                </div>
+                                <div class="col-md-12 mb-2">
+                                    <label for="presentacion" class="form-label">Presentación</label>
+                                    <input type="text" class="form-control" id="presentacion" placeholder="Ej: Tabletas, Cápsulas, Jarabe">
                                 </div>
                                 <div class="col-md-6 mb-2">
                                     <label for="dosis" class="form-label">Dosis (Ej: 500 mg)</label>
@@ -165,8 +169,8 @@
                                     <input type="text" class="form-control" id="duracion" placeholder="Ej: 7 días">
                                 </div>
                                 <div class="col-md-6 mb-2">
-                                    <label for="observaciones" class="form-label">Observaciones</label>
-                                    <input type="text" class="form-control" id="observaciones" placeholder="Ej: Tomar con alimentos">
+                                    <label for="indicaciones" class="form-label">Indicaciones</label>
+                                    <input type="text" class="form-control" id="indicaciones" placeholder="Ej: Tomar con alimentos">
                                 </div>
                                 <div class="col-md-12">
                                     <button type="submit" class="btn btn-danger btn-sm">
@@ -331,14 +335,13 @@ async function cargarRecetas() {
                 <div class="card-body p-3">
                     <div class="row">
                         <div class="col-md-8">
-                            <p class="mb-1"><strong>Medicamentos:</strong> ${r.medicamentos}</p>
+                            <p class="mb-1"><strong>Medicamento:</strong> ${r.medicamento_nombre}</p>
+                            <p class="mb-1"><small><strong>Presentación:</strong> ${r.presentacion || 'N/A'}</small></p>
                             <p class="mb-1"><small><strong>Dosis:</strong> ${r.dosis || 'N/A'}</small></p>
                             <p class="mb-1"><small><strong>Frecuencia:</strong> ${r.frecuencia || 'N/A'}</small></p>
                             <p class="mb-1"><small><strong>Duración:</strong> ${r.duracion || 'N/A'}</small></p>
-                            <% if (r.observaciones) { %>
-                                <p class="mb-1"><small><strong>Observaciones:</strong> ${r.observaciones}</small></p>
-                            <% } %>
-                            <small class="text-muted">Médico: ${r.nombre_medico} - ${new Date(r.fecha_creacion).toLocaleDateString('es-ES')}</small>
+                            ${r.indicaciones ? `<p class="mb-1"><small><strong>Indicaciones:</strong> ${r.indicaciones}</small></p>` : ''}
+                            <small class="text-muted">Médico: ${r.nombre_medico} - ${new Date(r.fecha_emision).toLocaleDateString('es-ES')}</small>
                         </div>
                         <div class="col-md-4">
                             <button class="btn btn-sm btn-primary w-100 mb-1" onclick="editarReceta('${r.id_receta}')">
@@ -362,23 +365,24 @@ async function cargarRecetas() {
 document.getElementById('formAgregarReceta').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const medicamentos = document.getElementById('medicamentos').value.trim();
+    const medicamento_nombre = document.getElementById('medicamento_nombre').value.trim();
+    const presentacion = document.getElementById('presentacion').value.trim();
     const dosis = document.getElementById('dosis').value.trim();
     const frecuencia = document.getElementById('frecuencia').value.trim();
     const duracion = document.getElementById('duracion').value.trim();
-    const observaciones = document.getElementById('observaciones').value.trim();
+    const indicaciones = document.getElementById('indicaciones').value.trim();
     
     try {
         const response = await fetch(`/historial/${idHistorial}/recetas`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                id_cita: null,
-                medicamentos,
+                medicamento_nombre,
+                presentacion: presentacion || null,
                 dosis: dosis || null,
                 frecuencia: frecuencia || null,
                 duracion: duracion || null,
-                observaciones: observaciones || null
+                indicaciones: indicaciones || null
             })
         });
         
