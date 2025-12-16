@@ -84,11 +84,6 @@ async function realizarBusqueda() {
     const query = document.getElementById('searchPaciente2').value.trim();
     const resultados = document.getElementById('pacienteResultados2');
     
-    if (query.length === 0) {
-        resultados.style.display = 'none';
-        return;
-    }
-    
     try {
         const response = await fetch(`/historial/buscar-paciente?q=${encodeURIComponent(query)}`);
         const data = await response.json();
