@@ -1,0 +1,75 @@
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-body p-4">
+        <h5 class="card-title mb-4"><i class="bi bi-shield-plus me-2"></i>Registrar nueva aseguradora</h5>
+
+        <% if (error) { %>
+          <div class="alert alert-danger"><%= error %></div>
+        <% } %>
+
+        <form method="post" action="/aseguradoras" class="needs-validation" novalidate accept-charset="UTF-8">
+          <div class="row g-3">
+            <!-- Información General -->
+            <h6 class="col-12 mt-3 text-muted">Información General</h6>
+            
+            <div class="col-md-6">
+              <label class="form-label">Nombre <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" name="nombre" value="<%= formData?.nombre || '' %>" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s\-\.]+$" title="Solo letras, espacios, guiones y puntos" placeholder="Ej: Seguros XYZ" />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Porcentaje de Cobertura <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input type="number" class="form-control" name="porcentaje_cobertura" value="<%= formData?.porcentaje_cobertura || '' %>" required min="0" max="100" step="0.01" placeholder="Ej: 80.50" />
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+
+            <!-- Contacto -->
+            <h6 class="col-12 mt-3 text-muted">Información de Contacto</h6>
+
+            <div class="col-md-6">
+              <label class="form-label">Correo Electrónico <span class="text-danger">*</span></label>
+              <input type="email" class="form-control" name="correo" value="<%= formData?.correo || '' %>" required placeholder="contacto@aseguradora.com" />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Teléfono <span class="text-danger">*</span></label>
+              <input type="tel" class="form-control" name="telefono" value="<%= formData?.telefono || '' %>" required pattern="^[0-9]{10,11}$" title="10-11 dígitos sin espacios" placeholder="Ej: 71234567" />
+            </div>
+
+            <!-- Descripción -->
+            <h6 class="col-12 mt-3 text-muted">Detalles</h6>
+
+            <div class="col-12">
+              <label class="form-label">Descripción</label>
+              <textarea class="form-control" name="descripcion" rows="3" placeholder="Información adicional sobre la aseguradora..."><%= formData?.descripcion || '' %></textarea>
+              <small class="form-text text-muted">Máximo 500 caracteres</small>
+            </div>
+
+            <!-- Fechas -->
+            <h6 class="col-12 mt-3 text-muted">Vigencia</h6>
+
+            <div class="col-md-6">
+              <label class="form-label">Fecha de Inicio <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="fecha_inicio" value="<%= formData?.fecha_inicio || '' %>" required />
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Fecha de Fin <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" name="fecha_fin" value="<%= formData?.fecha_fin || '' %>" required />
+              <small class="form-text text-muted">Debe ser posterior a la fecha de inicio</small>
+            </div>
+
+            <!-- Botones -->
+            <div class="col-12 mt-4">
+              <button type="submit" class="btn btn-primary me-2"><i class="bi bi-check-lg me-1"></i>Registrar</button>
+              <a href="/aseguradoras" class="btn btn-outline-secondary"><i class="bi bi-x-lg me-1"></i>Cancelar</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

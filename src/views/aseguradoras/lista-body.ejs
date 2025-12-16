@@ -1,0 +1,62 @@
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body p-4">
+        <!-- Header con botón nuevo -->
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <h5 class="card-title mb-0"><i class="bi bi-shield-check me-2"></i>Aseguradoras</h5>
+          <a href="/aseguradoras/registrar" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Nueva Aseguradora</a>
+        </div>
+
+        <!-- Tabla de aseguradoras -->
+        <% if (aseguradoras && aseguradoras.length > 0) { %>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th class="fw-semibold">Nombre</th>
+                  <th class="fw-semibold d-none d-md-table-cell">Correo</th>
+                  <th class="fw-semibold d-none d-lg-table-cell">Teléfono</th>
+                  <th class="fw-semibold text-center">Cobertura</th>
+                  <th class="fw-semibold d-none d-xl-table-cell">Vigencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% aseguradoras.forEach(ase => { %>
+                  <tr>
+                    <td>
+                      <strong><%= ase.nombre %></strong>
+                    </td>
+                    <td class="d-none d-md-table-cell">
+                      <small><%= ase.correo || '-' %></small>
+                    </td>
+                    <td class="d-none d-lg-table-cell">
+                      <small><%= ase.telefono || '-' %></small>
+                    </td>
+                    <td class="text-center">
+                      <span class="badge bg-info"><%= ase.porcentaje_cobertura %>%</span>
+                    </td>
+                    <td class="d-none d-xl-table-cell">
+                      <small>
+                        <% const inicio = new Date(ase.fecha_inicio).toLocaleDateString('es-BO'); %>
+                        <% const fin = new Date(ase.fecha_fin).toLocaleDateString('es-BO'); %>
+                        <%= inicio %> - <%= fin %>
+                      </small>
+                    </td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table>
+          </div>
+        <% } else { %>
+          <div class="alert alert-info text-center my-4">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>No hay aseguradoras registradas</strong>
+            <br>
+            <a href="/aseguradoras/registrar" class="alert-link">Registrar la primera aseguradora</a>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
