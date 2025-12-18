@@ -1,0 +1,301 @@
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2 class="mb-4"><i class="bi bi-bar-chart me-2"></i>Reportes del Multiconsultorio</h2>
+        </div>
+    </div>
+
+    <!-- Alertas -->
+    <div id="alertas"></div>
+
+    <!-- Tarjetas de Reportes -->
+    <div class="row g-3">
+        <!-- Reporte 1: Citas Diarias -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm" style="cursor: pointer; transition: transform 0.2s;">
+                <div class="card-body text-center">
+                    <div style="font-size: 48px; color: #007bff; margin-bottom: 15px;">📋</div>
+                    <h5 class="card-title">Citas Diarias</h5>
+                    <p class="card-text text-muted small">Reporte de citas del día</p>
+                    <button class="btn btn-sm btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#modalReporteCitas">
+                        <i class="bi bi-download me-1"></i>Generar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reporte 2: Caja Diaria -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div style="font-size: 48px; color: #28a745; margin-bottom: 15px;">💰</div>
+                    <h5 class="card-title">Caja Diaria</h5>
+                    <p class="card-text text-muted small">Reporte de pagos del día</p>
+                    <button class="btn btn-sm btn-success mt-3" data-bs-toggle="modal" data-bs-target="#modalReporteCaja">
+                        <i class="bi bi-download me-1"></i>Generar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reporte 3: Estadísticas Mensuales -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div style="font-size: 48px; color: #9c27b0; margin-bottom: 15px;">📊</div>
+                    <h5 class="card-title">Estadísticas</h5>
+                    <p class="card-text text-muted small">Estadísticas mensuales</p>
+                    <button class="btn btn-sm btn-purple mt-3" data-bs-toggle="modal" data-bs-target="#modalReporteStats" style="background: #9c27b0; border: none; color: white;">
+                        <i class="bi bi-download me-1"></i>Generar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reporte 4: Ranking Especialidades -->
+        <div class="col-md-6 col-lg-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div style="font-size: 48px; color: #ff9800; margin-bottom: 15px;">🏆</div>
+                    <h5 class="card-title">Ranking</h5>
+                    <p class="card-text text-muted small">Especialidades más solicitadas</p>
+                    <button class="btn btn-sm btn-warning mt-3" style="background: #ff9800; border: none; color: white;" data-bs-toggle="modal" data-bs-target="#modalReporteRanking">
+                        <i class="bi bi-download me-1"></i>Generar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reporte Citas Diarias -->
+<div class="modal fade" id="modalReporteCitas" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-calendar-event me-2"></i>Reporte de Citas Diarias</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Fecha</label>
+                    <input type="date" class="form-control" id="fecha_citas" value="<%= new Date().toISOString().split('T')[0] %>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="generarReporteCitas()">
+                    <i class="bi bi-download me-1"></i>Descargar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reporte Caja Diaria -->
+<div class="modal fade" id="modalReporteCaja" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Reporte de Caja Diaria</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Fecha</label>
+                    <input type="date" class="form-control" id="fecha_caja" value="<%= new Date().toISOString().split('T')[0] %>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="generarReporteCaja()">
+                    <i class="bi bi-download me-1"></i>Descargar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reporte Estadísticas Mensuales -->
+<div class="modal fade" id="modalReporteStats" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header text-white" style="background: #9c27b0;">
+                <h5 class="modal-title"><i class="bi bi-graph-up me-2"></i>Estadísticas Mensuales</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Mes</label>
+                    <input type="month" class="form-control" id="mes_stats" value="<%= new Date().toISOString().slice(0, 7) %>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn text-white" style="background: #9c27b0;" onclick="generarReporteStats()">
+                    <i class="bi bi-download me-1"></i>Descargar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reporte Ranking -->
+<div class="modal fade" id="modalReporteRanking" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header text-dark" style="background: #ff9800;">
+                <h5 class="modal-title"><i class="bi bi-trophy me-2"></i>Ranking de Especialidades</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Mes</label>
+                    <input type="month" class="form-control" id="mes_ranking" value="<%= new Date().toISOString().slice(0, 7) %>">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn text-white" style="background: #ff9800;" onclick="generarReporteRanking()">
+                    <i class="bi bi-download me-1"></i>Descargar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function generarReporteCitas() {
+        const fecha = document.getElementById('fecha_citas').value;
+        
+        if (!fecha) {
+            mostrarAlerta('Por favor selecciona una fecha', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/reportes/citas-diarias', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha })
+            });
+
+            if (!response.ok) throw new Error('Error al generar reporte');
+
+            const blob = await response.blob();
+            descargarPDF(blob, `Reporte_Citas_${fecha}.pdf`);
+            bootstrap.Modal.getInstance(document.getElementById('modalReporteCitas')).hide();
+            mostrarAlerta('✓ Reporte generado correctamente', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al generar reporte', 'danger');
+        }
+    }
+
+    async function generarReporteCaja() {
+        const fecha = document.getElementById('fecha_caja').value;
+        
+        if (!fecha) {
+            mostrarAlerta('Por favor selecciona una fecha', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/reportes/caja-diaria', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha })
+            });
+
+            if (!response.ok) throw new Error('Error al generar reporte');
+
+            const blob = await response.blob();
+            descargarPDF(blob, `Reporte_Caja_${fecha}.pdf`);
+            bootstrap.Modal.getInstance(document.getElementById('modalReporteCaja')).hide();
+            mostrarAlerta('✓ Reporte generado correctamente', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al generar reporte', 'danger');
+        }
+    }
+
+    async function generarReporteStats() {
+        const mesInput = document.getElementById('mes_stats').value;
+        
+        if (!mesInput) {
+            mostrarAlerta('Por favor selecciona un mes', 'warning');
+            return;
+        }
+
+        const [anio, mes] = mesInput.split('-');
+
+        try {
+            const response = await fetch('/reportes/estadisticas-mensuales', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ anio: parseInt(anio), mes: parseInt(mes) })
+            });
+
+            if (!response.ok) throw new Error('Error al generar reporte');
+
+            const blob = await response.blob();
+            descargarPDF(blob, `Reporte_Estadisticas_${mesInput}.pdf`);
+            bootstrap.Modal.getInstance(document.getElementById('modalReporteStats')).hide();
+            mostrarAlerta('✓ Reporte generado correctamente', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al generar reporte', 'danger');
+        }
+    }
+
+    async function generarReporteRanking() {
+        const mesInput = document.getElementById('mes_ranking').value;
+        
+        if (!mesInput) {
+            mostrarAlerta('Por favor selecciona un mes', 'warning');
+            return;
+        }
+
+        const [anio, mes] = mesInput.split('-');
+
+        try {
+            const response = await fetch('/reportes/ranking-especialidades', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ anio: parseInt(anio), mes: parseInt(mes) })
+            });
+
+            if (!response.ok) throw new Error('Error al generar reporte');
+
+            const blob = await response.blob();
+            descargarPDF(blob, `Reporte_Ranking_${mesInput}.pdf`);
+            bootstrap.Modal.getInstance(document.getElementById('modalReporteRanking')).hide();
+            mostrarAlerta('✓ Reporte generado correctamente', 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al generar reporte', 'danger');
+        }
+    }
+
+    function descargarPDF(blob, nombre) {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nombre;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    }
+
+    function mostrarAlerta(mensaje, tipo = 'danger') {
+        const alertasDiv = document.getElementById('alertas');
+        alertasDiv.innerHTML = `
+            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                <i class="bi bi-${tipo === 'success' ? 'check-circle' : tipo === 'warning' ? 'exclamation-circle' : 'exclamation-triangle'} me-2"></i>
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+</script>

@@ -4,17 +4,13 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /pacientes - Listar pacientes (admin, ventanilla y medico)
 router.get('/pacientes', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   try {
-    const filtro = req.query.filtro || (req.user.nombre_rol === 'admin' ? 'todos' : 'activos');
+    const filtro = 'activos'; 
     const pagina = parseInt(req.query.pagina) || 1;
     const porPagina = 20;
-    
     const [pacientes] = await pool.query('CALL sp_pac_listar(?)', [filtro]);
     const lista = Array.isArray(pacientes) ? pacientes[0] : pacientes;
-    
-    // Calcular paginación
     const totalPacientes = lista.length;
     const totalPaginas = Math.ceil(totalPacientes / porPagina);
     const paginaActual = Math.max(1, Math.min(pagina, totalPaginas));
@@ -25,17 +21,17 @@ router.get('/pacientes', requireAuth, requireRole(['admin', 'ventanilla', 'medic
     res.render('pacientes/lista', { 
       user: req.user, 
       pacientes: pacientesPaginados, 
-      filtroActual: filtro,
+      //se filtraba pero ya no por que los usuarios no son god y son zzz
+      filtroActual: 'activos',
       paginaActual,
       totalPaginas,
       totalPacientes
     });
   } catch (err) {
-    res.status(500).send('Error al cargar pacientes.');
+    res.status(500).send('Algo fallo causa!!.');
   }
 });
 
-// GET /pacientes/buscar - Buscar pacientes (admin, ventanilla y medico)
 router.get('/pacientes/buscar', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   try {
     const termino = req.query.q || '';
@@ -43,30 +39,26 @@ router.get('/pacientes/buscar', requireAuth, requireRole(['admin', 'ventanilla',
     
     if (termino.trim().length > 0) {
       const [result] = await pool.query('CALL sp_pac_buscar(?, ?)', [termino, true]);
-      pacientes = Array.isArray(result) ? result[0] : result;
-      
-      // Limitar a 50 resultados
+      pacientes = Array.isArray(result) ? result[0] : result;  
+      //paginacion de 50, creo que era 20 si no entonces que se quede así(alt + 161) para la í
       if (pacientes.length > 50) {
         pacientes = pacientes.slice(0, 50);
       }
     }
     
-    // Si es AJAX, devolver JSON
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       return res.json({ pacientes });
     }
     
-    // Si no es AJAX, mostrar vista
     res.render('pacientes/buscar', { user: req.user, pacientes, termino });
   } catch (err) {
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
-      return res.status(500).json({ error: 'Error al buscar pacientes.' });
+      return res.status(500).json({ error: 'Error al buscar pacientes (algo fallo (talvez el error esta entre el teclado y la silla)).' });
     }
-    res.status(500).send('Error al buscar pacientes.');
+    res.status(500).send('Error al buscar pacientes (algo fallo (talvez el error esta entre el teclado y la silla)).');
   }
 });
 
-// GET /pacientes/obtener-detalles/:id - Obtener detalles como modal (AJAX)
 router.get('/pacientes/obtener-detalles/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   const { id } = req.params;
   try {
@@ -78,11 +70,10 @@ router.get('/pacientes/obtener-detalles/:id', requireAuth, requireRole(['admin',
     const paciente = pacientes[0];
     res.render('pacientes/detalles-modal', { paciente, layout: false });
   } catch (err) {
-    res.status(500).send('Error al cargar detalles del paciente.');
+    res.status(500).send('Error al cargar detalles del paciente.(esperemos y no veas este mensaje juas juas)');
   }
 });
 
-// GET /pacientes/detalles/:id - Ver detalles del paciente (RF-PAC-005 - admin, ventanilla, medico)
 router.get('/pacientes/detalles/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   const { id } = req.params;
   try {
@@ -94,16 +85,14 @@ router.get('/pacientes/detalles/:id', requireAuth, requireRole(['admin', 'ventan
     const paciente = pacientes[0];
     res.render('pacientes/detalles', { user: req.user, paciente });
   } catch (err) {
-    res.status(500).send('Error al cargar detalles del paciente.');
+    res.status(500).send('algo fallo en algun lado al cargar detalles del paciente.');
   }
 });
 
-// GET /pacientes/crear - Mostrar formulario (admin y ventanilla)
 router.get('/pacientes/crear', requireAuth, requireRole(['admin', 'ventanilla']), (req, res) => {
-  res.render('pacientes/crear', { user: req.user, error: null });
+  res.render('pacientes/crear', { user: req.user, error: null, formData: {} });
 });
 
-// POST /pacientes - Registrar paciente (admin y ventanilla)
 router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   const {
     nombre,
@@ -123,18 +112,18 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     correo,
   } = req.body;
 
-  // Validaciones Frontend
   const errors = [];
 
-  // Validar campos obligatorios
   if (!nombre || nombre.trim() === '') {
     errors.push('El nombre es obligatorio.');
+    //quien con un nombre español lleva una tilde incluso en su mayuscula
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombre)) {
     errors.push('El nombre solo puede contener letras y espacios.');
   }
 
   if (!apellido_paterno || apellido_paterno.trim() === '') {
     errors.push('El apellido paterno es obligatorio.');
+    //mas raro aun en algun apellido
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_paterno)) {
     errors.push('El apellido paterno solo puede contener letras y espacios.');
   }
@@ -143,21 +132,19 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     errors.push('El apellido materno solo puede contener letras y espacios.');
   }
 
-  // Validar CI
   if (!ci || ci.trim() === '') {
     errors.push('El CI es obligatorio.');
   } else if (!/^[0-9]{7,8}[A-Z]?$/.test(ci)) {
-    errors.push('El CI debe tener 7-8 dígitos más una letra opcional (formato boliviano).');
+    errors.push('El CI debe tener 7-8 dígitos más una letra opcional (para las copias de carnet).');
   }
 
-  // Validar teléfono/celular
   if (!celular || celular.trim() === '') {
     errors.push('El celular es obligatorio.');
-  } else if (!/^[0-9]{10,11}$/.test(celular.replace(/\D/g, ''))) {
-    errors.push('El celular debe tener 10-11 dígitos.');
+    //se admite codigo pais, (osea peru incluido (por desgracia)), tambien espacios y guiones 
+  } else if (!/^(\+\d{1,3}[- ]?)?\d{8,14}$/.test(celular.replace(/\s/g, ''))) {
+    errors.push('El celular debe tener 8-11 dígitos incluido código de país y guiones.');
   }
 
-  // Validar fecha de nacimiento - Obligatoria
   if (!fecha_nacimiento || fecha_nacimiento.trim() === '') {
     errors.push('La fecha de nacimiento es obligatoria.');
   } else {
@@ -169,12 +156,11 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    if (age < 1 || age >= 100) {
-      errors.push('La edad debe estar entre 1 y 99 años.');
+    if (age < 0 || age >= 100) {
+      errors.push('La edad debe estar entre 0 y 99 años.');
     }
   }
 
-  // Validar correo si se proporciona
   if (correo && correo.trim() !== '') {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(correo)) {
@@ -182,11 +168,12 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     }
   }
 
-  // Si hay errores, devolver formulario con errores
   if (errors.length > 0) {
     return res.status(400).render('pacientes/crear', {
       user: req.user,
       error: errors.join(' '),
+      //ahora para los vagos que no quieren llenar todo de nuevo jeje
+      formData: req.body,
     });
   }
 
@@ -209,17 +196,14 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
       correo || null,
     ]);
 
-    // Obtener los valores de salida
     const [[output]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje, @p_codigo AS codigo');
 
     if (output.success) {
-      // Obtener el ID del paciente creado (usar el más reciente con el CI que acabamos de registrar)
       const [pacienteCreado] = await pool.query('SELECT id_paciente FROM tpaciente WHERE ci = ? LIMIT 1', [ci]);
       
       if (pacienteCreado && pacienteCreado.length > 0) {
         const id_paciente = pacienteCreado[0].id_paciente;
         
-        // Crear un historial vacío para el paciente
         try {
           await pool.query(
             `INSERT INTO thistorial_paciente (id_paciente, diagnosticos, evoluciones, antecedentes, tratamientos, estado, fecha_creacion)
@@ -228,7 +212,6 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
           );
         } catch (err) {
           console.error('Error al crear historial vacío:', err);
-          // No detener el proceso si falla la creación del historial
         }
       }
       
@@ -241,8 +224,7 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
       });
     }
   } catch (err) {
-    // Extraer mensaje de error del SP si está disponible
-    let errorMessage = 'Error al registrar paciente. Intente nuevamente.';
+    let errorMessage = 'Error al registrar paciente.';
     if (err.sqlMessage) {
       errorMessage = err.sqlMessage;
     }
@@ -254,8 +236,7 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
   }
 });
 
-// GET /pacientes/obtener-form/:id - Obtener formulario para modal (AJAX)
-router.get('/pacientes/obtener-form/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
+router.get('/pacientes/obtener-form/:id', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
@@ -270,8 +251,7 @@ router.get('/pacientes/obtener-form/:id', requireAuth, requireRole(['admin', 've
   }
 });
 
-// GET /pacientes/editar/:id - Mostrar formulario de edición (admin, ventanilla, medico)
-router.get('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
+router.get('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   const { id } = req.params;
   try {
     const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
@@ -286,11 +266,9 @@ router.get('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventanil
   }
 });
 
-// POST /pacientes/editar/:id - Actualizar paciente (admin, ventanilla, medico)
 router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   const { id } = req.params;
   
-  // Guard: verificar que req.body existe
   if (!req.body || Object.keys(req.body).length === 0) {
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       return res.status(400).json({ success: false, mensaje: 'No se recibieron datos del formulario.' });
@@ -320,10 +298,8 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
     correo,
   } = req.body;
 
-  // Validaciones Frontend
   const errors = [];
 
-  // Validar campos obligatorios
   if (!nombre || nombre.trim() === '') {
     errors.push('El nombre es obligatorio.');
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombre)) {
@@ -340,21 +316,18 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
     errors.push('El apellido materno solo puede contener letras y espacios.');
   }
 
-  // Validar CI
   if (!ci || ci.trim() === '') {
     errors.push('El CI es obligatorio.');
   } else if (!/^[0-9]{7,8}[A-Z]?$/.test(ci)) {
     errors.push('El CI debe tener 7-8 dígitos más una letra opcional (formato boliviano).');
   }
 
-  // Validar teléfono/celular
   if (!celular || celular.trim() === '') {
     errors.push('El celular es obligatorio.');
-  } else if (!/^[0-9]{10,11}$/.test(celular.replace(/\D/g, ''))) {
-    errors.push('El celular debe tener 10-11 dígitos.');
+  } else if (!/^(\+\d{1,3}[- ]?)?\d{8,14}$/.test(celular.replace(/\s/g, ''))) {
+    errors.push('El celular debe tener 8-11 dígitos incluido código de país y guiones.');
   }
 
-  // Validar fecha de nacimiento - Obligatoria
   if (!fecha_nacimiento || (typeof fecha_nacimiento === 'string' && fecha_nacimiento.trim() === '')) {
     errors.push('La fecha de nacimiento es obligatoria.');
   } else if (fecha_nacimiento) {
@@ -367,15 +340,14 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
-      if (age < 1 || age >= 100) {
-        errors.push('La edad debe estar entre 1 y 99 años.');
+      if (age < 0 || age >= 100) {
+        errors.push('La edad debe estar entre 0 y 99 años.');
       }
     } catch (err) {
       errors.push('Formato de fecha de nacimiento inválido.');
     }
   }
 
-  // Validar correo si se proporciona
   if (correo && correo.trim() !== '') {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(correo)) {
@@ -383,9 +355,7 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
     }
   }
 
-  // Si hay errores, devolver formulario con errores
   if (errors.length > 0) {
-    // Si es AJAX, devolver JSON
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       return res.status(400).json({ success: false, mensaje: errors.join(' ') });
     }
@@ -395,7 +365,8 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
     const paciente = pacientes[0];
     return res.status(400).render('pacientes/editar', {
       user: req.user,
-      paciente,
+      //si la pelan pueden volver a intentar sin perder lo que escribieron
+      paciente: { ...paciente, ...req.body },
       error: errors.join(' '),
     });
   }
@@ -422,42 +393,38 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
 
     const [[output]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje');
 
-    // Si es AJAX, devolver JSON
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       if (output.success) {
         return res.json({ success: true, mensaje: 'Paciente actualizado exitosamente.' });
       } else {
-        return res.status(400).json({ success: false, mensaje: output.mensaje });
+        return res.status(400).json({ success: false, mensaje: 'wajaaja' + output.mensaje });
       }
     }
 
-    // Si no es AJAX, redirigir
     if (output.success) {
       return res.redirect('/pacientes?success=Paciente actualizado exitosamente.');
     } else {
-      // Recargar paciente para mostrar form con error
       const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
       const pacientes = Array.isArray(result) ? result[0] : result;
       const paciente = pacientes[0];
       return res.status(400).render('pacientes/editar', {
         user: req.user,
         paciente,
-        error: output.mensaje,
+        error: (output.mensaje + "sera aca?"),
       });
     }
   } catch (err) {
-    // Extraer mensaje de error del SP si está disponible
-    let errorMessage = 'Error al actualizar paciente. Intente nuevamente.';
+    let errorMessage = 'Error al actualizar paciente.';
     if (err.sqlMessage) {
+      //desde aqui se cargan los mensajes de error personalizados de los SP
+      // los de arriba irian en vano pero que se queden por que si
       errorMessage = err.sqlMessage;
     }
     
-    // Si es AJAX, devolver JSON
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       return res.status(err.code === 'ER_SIGNAL_EXCEPTION' ? 400 : 500).json({ success: false, mensaje: errorMessage });
     }
 
-    // Si no es AJAX, intentar recargar paciente
     try {
       const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
       const pacientes = Array.isArray(result) ? result[0] : result;
@@ -468,8 +435,7 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
         error: errorMessage,
       });
     } catch (err2) {
-      // Si no se puede obtener el paciente, mostrar error simple
-      return res.status(500).render('error', {
+      return res.status(500).render('error a que si tilin', {
         user: req.user,
         message: errorMessage,
       });
@@ -477,20 +443,19 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
   }
 });
 
-// POST /pacientes/toggle-estado/:id - Activar/Desactivar paciente (admin solo) (Para el modulo de citas los pacientes inactivos no pueden generar citas)
-router.post('/pacientes/toggle-estado/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+router.post('/pacientes/eliminar/:id', requireAuth, requireRole(['admin']), async (req, res) => {
   const { id } = req.params;
   try {
     await pool.query('CALL sp_pac_toggle_estado(?, @p_nuevo_estado, @p_success, @p_msg)', [id]);
     const [[output]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje, @p_nuevo_estado AS nuevoEstado');
 
     if (output.success) {
-      return res.redirect('/pacientes?success=' + encodeURIComponent(output.mensaje));
+      return res.json({ success: true, mensaje: 'Paciente eliminado exitosamente (baneado del sistema).' });
     } else {
-      return res.status(400).redirect('/pacientes?error=' + encodeURIComponent(output.mensaje));
+      return res.status(400).json({ success: false, mensaje: output.mensaje });
     }
   } catch (err) {
-    return res.status(500).redirect('/pacientes?error=Error al cambiar estado del paciente.');
+    return res.status(500).json({ success: false, mensaje: 'Error al eliminar el paciente.' });
   }
 });
 

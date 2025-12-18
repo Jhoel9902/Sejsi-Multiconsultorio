@@ -31,15 +31,15 @@
           <div class="row g-3 mb-4">
             <div class="col-md-6">
               <label class="form-label">Cédula de Identidad <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="ci" required pattern="^[0-9]{7,8}[A-Z]?$" title="Formato: 7-8 dígitos + letra opcional" placeholder="Ej: 12345678 o 12345678A" />
+              <input type="text" class="form-control" name="ci" value="<%= formData?.ci || '' %>" required pattern="^[0-9]{7,8}[A-Z]?$" title="Formato: 7-8 dígitos + letra opcional" placeholder="Ej: 12345678 o 12345678A" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Rol <span class="text-danger">*</span></label>
-              <select class="form-select" id="idRol" name="id_rol" onchange="actualizarEspecialidades()" required>
+              <select class="form-select" id="idRol" name="id_rol" value="<%= formData?.id_rol || '' %>" onchange="actualizarEspecialidades()" required>
                 <option value="">-- Seleccionar rol --</option>
                 <% if (roles && roles.length > 0) { %>
                   <% roles.forEach(rol => { %>
-                    <option value="<%= rol.id_rol %>"><%= rol.nombre_rol %></option>
+                    <option value="<%= rol.id_rol %>" <%= formData?.id_rol === rol.id_rol.toString() ? 'selected' : '' %>><%= rol.nombre_rol %></option>
                   <% }); %>
                 <% } else { %>
                   <option value="0fe2336b-d854-11f0-9531-40c2ba62ef61">Admin</option>
@@ -50,19 +50,19 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Nombres <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="nombres" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
+              <input type="text" class="form-control" name="nombres" value="<%= formData?.nombres || '' %>" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido Paterno <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="apellido_paterno" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
+              <input type="text" class="form-control" name="apellido_paterno" value="<%= formData?.apellido_paterno || '' %>" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido Materno</label>
-              <input type="text" class="form-control" name="apellido_materno" pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]*$" title="Solo letras y espacios" />
+              <input type="text" class="form-control" name="apellido_materno" value="<%= formData?.apellido_materno || '' %>" pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]*$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Cargo</label>
-              <input type="text" class="form-control" name="cargo" />
+              <input type="text" class="form-control" name="cargo" value="<%= formData?.cargo || '' %>" />
             </div>
           </div>
 
@@ -75,15 +75,15 @@
           <div class="row g-3 mb-4">
             <div class="col-md-6">
               <label class="form-label">Correo Electrónico</label>
-              <input type="email" class="form-control" name="correo" />
+              <input type="email" class="form-control" name="correo" value="<%= formData?.correo || '' %>" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Teléfono <span class="text-danger">*</span></label>
-              <input type="tel" class="form-control" name="celular" required pattern="^[0-9]{10,11}$" title="10-11 dígitos sin espacios" placeholder="Ej: 71234567" />
+              <input type="tel" class="form-control" name="celular" value="<%= formData?.celular || '' %>" required placeholder="Ej: +591 70 123456 o 70123456" />
             </div>
             <div class="col-12">
               <label class="form-label">Domicilio</label>
-              <input type="text" class="form-control" name="domicilio" />
+              <input type="text" class="form-control" name="domicilio" value="<%= formData?.domicilio || '' %>" />
             </div>
           </div>
 
@@ -96,12 +96,12 @@
           <div class="row g-3 mb-4">
             <div class="col-md-6">
               <label class="form-label">Fecha de Nacimiento <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="fecha_nacimiento" required />
+              <input type="date" class="form-control" name="fecha_nacimiento" value="<%= formData?.fecha_nacimiento || '' %>" required />
               <small class="form-text text-muted">Debe ser mayor de 18 años</small>
             </div>
             <div class="col-md-6">
               <label class="form-label">Fecha de Contratación <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="fecha_contratacion" required />
+              <input type="date" class="form-control" name="fecha_contratacion" value="<%= formData?.fecha_contratacion || '' %>" required />
             </div>
           </div>
 
@@ -126,6 +126,7 @@
                             name="especialidades" 
                             value="<%= esp.id_especialidad %>" 
                             id="esp_<%= esp.id_especialidad %>"
+                            <% if (formData?.especialidades && (Array.isArray(formData.especialidades) ? formData.especialidades.includes(esp.id_especialidad.toString()) : formData.especialidades === esp.id_especialidad.toString())) { %> checked <% } %>
                           />
                           <label class="form-check-label" for="esp_<%= esp.id_especialidad %>">
                             <%= esp.nombre %>

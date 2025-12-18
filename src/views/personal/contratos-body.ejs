@@ -37,14 +37,14 @@
                   <% personalContratos.forEach(p => { %>
                     <tr>
                       <td>
-                        <strong><%= p.nombre_completo %></strong>
+                        <strong><%= p.nombres %> <%= p.apellido_paterno %> <%= p.apellido_materno || '' %></strong>
                       </td>
                       <td><%= p.ci %></td>
                       <td>
                         <span class="badge bg-light text-dark"><%= p.cargo %></span>
                       </td>
                       <td>
-                        <small class="text-muted"><%= new Date(p.fecha_contratacion).toLocaleDateString('es-ES') %></small>
+                        <small class="text-muted"><%= p.fecha_contratacion ? new Date(p.fecha_contratacion).toLocaleDateString('es-ES') : '-' %></small>
                       </td>
                       <td>
                         <% if (p.archivo_contrato) { %>
@@ -59,12 +59,12 @@
                       </td>
                       <td class="text-center">
                         <% if (p.archivo_contrato) { %>
-                          <a href="<%= p.archivo_contrato %>" class="btn btn-sm btn-primary" download target="_blank" title="Descargar contrato">
-                            <i class="bi bi-download"></i>
+                          <a href="<%= p.archivo_contrato %>" class="btn btn-sm btn-primary" target="_blank" title="Ver contrato">
+                            <i class="bi bi-eye"></i>
                           </a>
                         <% } else { %>
                           <button class="btn btn-sm btn-secondary" disabled title="Sin contrato">
-                            <i class="bi bi-download"></i>
+                            <i class="bi bi-eye"></i>
                           </button>
                         <% } %>
                       </td>

@@ -2,21 +2,26 @@
   <div class="col-12">
     <div class="card">
       <div class="card-body p-4">
-        <!-- Header con filtros y botón nuevo -->
+        <!-- Barra de búsqueda -->
+        <div class="mb-4">
+          <div class="input-group">
+            <span class="input-group-text bg-light border-0"><i class="bi bi-search"></i></span>
+            <input 
+              type="text" 
+              class="form-control border-start-0" 
+              id="inputBusqueda" 
+              placeholder="Buscar por nombre, apellido, código, CI o correo..."
+              autocomplete="off"
+            >
+          </div>
+        </div>
+
+        <!-- El medico no puede agregar pacientes solo vent y el admin -->
         <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
           <h5 class="card-title mb-0"><i class="bi bi-people me-2"></i>Pacientes</h5>
-          <div class="d-flex gap-2 flex-wrap">
-            <% if (user.nombre_rol === 'admin') { %>
-              <div class="btn-group btn-group-sm" role="group">
-                <a href="/pacientes?filtro=todos" class="btn <%= filtroActual === 'todos' ? 'btn-primary' : 'btn-outline-primary' %>">Todos</a>
-                <a href="/pacientes?filtro=activos" class="btn <%= filtroActual === 'activos' ? 'btn-success' : 'btn-outline-success' %>">Activos</a>
-                <a href="/pacientes?filtro=inactivos" class="btn <%= filtroActual === 'inactivos' ? 'btn-danger' : 'btn-outline-danger' %>">Inactivos</a>
-              </div>
-            <% } %>
-            <% if (user.nombre_rol !== 'medico') { %>
-              <a href="/pacientes/crear" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Nuevo</a>
-            <% } %>
-          </div>
+          <% if (user.nombre_rol !== 'medico') { %>
+            <a href="/pacientes/crear" class="btn btn-primary btn-sm"><i class="bi bi-person-plus me-1"></i>Nuevo</a>
+          <% } %>
         </div>
 
         <!-- Tabla de pacientes -->
@@ -30,9 +35,6 @@
                   <th class="fw-semibold d-none d-md-table-cell">Cédula</th>
                   <th class="fw-semibold d-none d-lg-table-cell">Teléfono</th>
                   <th class="fw-semibold d-none d-xl-table-cell">Correo</th>
-                  <% if (user.nombre_rol === 'admin') { %>
-                    <th class="fw-semibold">Estado</th>
-                  <% } %>
                   <th class="fw-semibold text-center">Acciones</th>
                 </tr>
               </thead>
@@ -51,29 +53,21 @@
                     <td class="d-none d-md-table-cell"><small><%= p.ci || '-' %></small></td>
                     <td class="d-none d-lg-table-cell"><small><%= p.celular || '-' %></small></td>
                     <td class="d-none d-xl-table-cell"><small><%= p.correo || '-' %></small></td>
-                    <% if (user.nombre_rol === 'admin') { %>
-                      <td>
-                        <form method="post" action="/pacientes/toggle-estado/<%= p.id_paciente %>" class="d-inline">
-                          <% if (p.estado) { %>
-                            <button type="submit" class="btn btn-sm btn-success" title="Activo - Click para desactivar">
-                              <i class="bi bi-toggle-on"></i>
-                            </button>
-                          <% } else { %>
-                            <button type="submit" class="btn btn-sm btn-danger" title="Inactivo - Click para activar">
-                              <i class="bi bi-toggle-off"></i>
-                            </button>
-                          <% } %>
-                        </form>
-                      </td>
-                    <% } %>
                     <td class="text-center">
                       <div class="btn-group btn-group-sm" role="group">
                         <button type="button" class="btn btn-outline-info" onclick="abrirModalDetalles('<%= p.id_paciente %>')" title="Ver detalles del paciente">
                           <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn btn-outline-secondary" onclick="abrirModalEditar('<%= p.id_paciente %>')" title="Editar paciente">
-                          <i class="bi bi-pencil"></i>
-                        </button>
+                        <% if (user.nombre_rol !== 'medico') { %>
+                          <button class="btn btn-outline-secondary" onclick="abrirModalEditar('<%= p.id_paciente %>')" title="Editar paciente">
+                            <i class="bi bi-pencil"></i>
+                          </button>
+                        <% } %>
+                        <% if (user.nombre_rol === 'admin') { %>
+                          <button type="button" class="btn btn-outline-danger" onclick="eliminarPaciente('<%= p.id_paciente %>', '<%= p.nombre %> <%= p.apellido_paterno %>')" title="Eliminar paciente (borrado lógico)">
+                            <i class="bi bi-trash"></i>
+                          </button>
+                        <% } %>
                       </div>
                     </td>
                   </tr>
@@ -94,11 +88,11 @@
 
         <!-- Paginación -->
         <% if (pacientes && pacientes.length > 0 && totalPaginas > 1) { %>
-          <nav aria-label="Paginación de pacientes" class="mt-4">
+          <nav aria-label="Paginación de pacientes" class="mt-4" id="seccionPaginacion">
             <ul class="pagination justify-content-center">
               <!-- Página anterior -->
               <li class="page-item <%= paginaActual === 1 ? 'disabled' : '' %>">
-                <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= paginaActual - 1 %>">Anterior</a>
+                <a class="page-link limpiarBusquedaLink" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= paginaActual - 1 %>">Anterior</a>
               </li>
 
               <!-- Números de página -->
@@ -108,7 +102,7 @@
                 
                 if (mostrarDesde > 1) { %>
                   <li class="page-item">
-                    <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=1">1</a>
+                    <a class="page-link limpiarBusquedaLink" href="/pacientes?filtro=<%= filtroActual %>&pagina=1">1</a>
                   </li>
                   <% if (mostrarDesde > 2) { %>
                     <li class="page-item disabled"><span class="page-link">...</span></li>
@@ -117,7 +111,7 @@
 
               <% for (let i = mostrarDesde; i <= mostrarHasta; i++) { %>
                 <li class="page-item <%= i === paginaActual ? 'active' : '' %>">
-                  <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= i %>"><%= i %></a>
+                  <a class="page-link limpiarBusquedaLink" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= i %>"><%= i %></a>
                 </li>
               <% } %>
 
@@ -126,19 +120,19 @@
                   <li class="page-item disabled"><span class="page-link">...</span></li>
                 <% } %>
                 <li class="page-item">
-                  <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= totalPaginas %>"><%= totalPaginas %></a>
+                  <a class="page-link limpiarBusquedaLink" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= totalPaginas %>"><%= totalPaginas %></a>
                 </li>
               <% } %>
 
               <!-- Página siguiente -->
               <li class="page-item <%= paginaActual === totalPaginas ? 'disabled' : '' %>">
-                <a class="page-link" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= paginaActual + 1 %>">Siguiente</a>
+                <a class="page-link limpiarBusquedaLink" href="/pacientes?filtro=<%= filtroActual %>&pagina=<%= paginaActual + 1 %>">Siguiente</a>
               </li>
             </ul>
           </nav>
           
           <!-- Info de paginación -->
-          <div class="text-center text-muted small mt-2">
+          <div class="text-center text-muted small mt-2" id="infoPaginacion">
             Mostrando <strong><%= (paginaActual - 1) * 20 + 1 %></strong> a <strong><%= Math.min(paginaActual * 20, totalPacientes) %></strong> de <strong><%= totalPacientes %></strong> pacientes
           </div>
         <% } %>
@@ -185,6 +179,144 @@
 </div>
 
 <script>
+let pacientesOriginales = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+  const filas = document.querySelectorAll('tbody tr');
+  filas.forEach(fila => {
+    const codigo = fila.querySelector('td:nth-child(1)').textContent;
+    const td_nombre = fila.querySelector('td:nth-child(2)');
+    const nombres = td_nombre.textContent;
+    const ci = fila.querySelector('td:nth-child(3)').textContent;
+    const correo = fila.querySelector('td:nth-child(5)').textContent;
+    
+    pacientesOriginales.push({
+      fila: fila.cloneNode(true),
+      codigo: codigo.toLowerCase(),
+      nombres: nombres.toLowerCase(),
+      ci: ci.toLowerCase(),
+      correo: correo.toLowerCase()
+    });
+  });
+  
+  const inputBusqueda = document.getElementById('inputBusqueda');
+  if (inputBusqueda) {
+    inputBusqueda.addEventListener('keyup', realizarBusqueda);
+  }
+});
+
+function realizarBusqueda() {
+  const termino = document.getElementById('inputBusqueda').value.toLowerCase().trim();
+  const tbody = document.querySelector('tbody');
+  const seccionPaginacion = document.getElementById('seccionPaginacion');
+  const infoPaginacion = document.getElementById('infoPaginacion');
+  
+  if (termino === '') {
+    // Si el input está vacío, mostrar todos y revelar paginación
+    tbody.innerHTML = '';
+    pacientesOriginales.forEach(item => {
+      tbody.appendChild(item.fila.cloneNode(true));
+    });
+    // Mostrar paginación si hay más de 1 página
+    if (seccionPaginacion) seccionPaginacion.style.display = 'block';
+    if (infoPaginacion) infoPaginacion.style.display = 'block';
+    // Re-asignar eventos a nuevos elementos
+    asignarEventos();
+    return;
+  }
+  
+  // Filtrar pacientes
+  const resultados = pacientesOriginales.filter(item => {
+    return item.codigo.includes(termino) ||
+           item.nombres.includes(termino) ||
+           item.ci.includes(termino) ||
+           item.correo.includes(termino);
+  });
+  
+  // Actualizar tabla
+  tbody.innerHTML = '';
+  if (resultados.length > 0) {
+    resultados.forEach(item => {
+      tbody.appendChild(item.fila.cloneNode(true));
+    });
+  } else {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-search me-2"></i>No se encontraron pacientes.</td></tr>';
+  }
+  
+  // OCULTAR paginación cuando hay búsqueda activa
+  if (seccionPaginacion) seccionPaginacion.style.display = 'none';
+  if (infoPaginacion) infoPaginacion.style.display = 'none';
+  
+  // Re-asignar eventos a nuevos elementos
+  asignarEventos();
+}
+
+function asignarEventos() {
+  // Re-asignar onclick a botones después de filtrar
+  const botonesDetalles = document.querySelectorAll('button[onclick*="abrirModalDetalles"]');
+  const botonesEditar = document.querySelectorAll('button[onclick*="abrirModalEditar"]');
+  const botonesEliminar = document.querySelectorAll('button[onclick*="eliminarPaciente"]');
+  const linksLimpiarBusqueda = document.querySelectorAll('a.limpiarBusquedaLink');
+  
+  botonesDetalles.forEach(btn => {
+    btn.onclick = null;
+    const idPaciente = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
+    btn.onclick = () => abrirModalDetalles(idPaciente);
+  });
+  
+  botonesEditar.forEach(btn => {
+    btn.onclick = null;
+    const idPaciente = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
+    btn.onclick = () => abrirModalEditar(idPaciente);
+  });
+  
+  botonesEliminar.forEach(btn => {
+    btn.onclick = null;
+    const match = btn.getAttribute('onclick').match(/'([^']+)',\s*'([^']+)'/);
+    const idPaciente = match[1];
+    const nombre = match[2];
+    btn.onclick = () => eliminarPaciente(idPaciente, nombre);
+  });
+  
+  // Agregar evento a links de paginación para limpiar búsqueda
+  linksLimpiarBusqueda.forEach(link => {
+    link.addEventListener('click', function(e) {
+      const inputBusqueda = document.getElementById('inputBusqueda');
+      if (inputBusqueda && inputBusqueda.value.trim() !== '') {
+        e.preventDefault();
+        inputBusqueda.value = '';
+        // Navegar a la URL del link
+        window.location.href = this.href;
+      }
+    });
+  });
+}
+
+async function eliminarPaciente(idPaciente, nombre) {
+  if (!confirm(`¿Está seguro de que desea eliminar al paciente "${nombre}"? Esta acción no se puede deshacer.`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/pacientes/eliminar/${idPaciente}`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    
+    if (response.ok) {
+      showToast('Éxito', 'Paciente eliminado exitosamente.', 'success');
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      const data = await response.json();
+      showToast('Error', data.mensaje || 'No se pudo eliminar el paciente.', 'danger');
+    }
+  } catch (err) {
+    showToast('Error', 'Error al eliminar: ' + err.message, 'danger');
+  }
+}
+
 async function abrirModalEditar(idPaciente) {
   const modal = new bootstrap.Modal(document.getElementById('modalEditar'));
   const modalBody = document.getElementById('modalBody');
@@ -264,7 +396,8 @@ function showToast(title, message, type = 'success') {
     <div class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
       <div class="d-flex">
         <div class="toast-body">
-          <strong>${title}:</strong> ${message}
+          <!--El mensaje de error esta aqui (los errores de la BD estan igual en sp y back + front XD?)-->
+          <strong>Talvez aqui?? ${title}:</strong> ${message}
         </div>
         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>

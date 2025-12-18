@@ -4,7 +4,6 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /horarios/gestionar - Gestionar horarios del personal (admin)
 router.get('/horarios/gestionar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     // Obtener lista de personal activo

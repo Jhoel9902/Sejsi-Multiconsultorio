@@ -139,9 +139,11 @@
                               <button type="button" class="btn btn-info btn-sm" onclick="abrirModalDetallesBuscar('<%= p.id_paciente %>')">
                                 <i class="bi bi-eye me-1"></i>Ver Detalles
                               </button>
-                              <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalEditarBuscar('<%= p.id_paciente %>')">
-                                <i class="bi bi-pencil me-1"></i>Editar
-                              </button>
+                              <% if (user.nombre_rol !== 'medico') { %>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="abrirModalEditarBuscar('<%= p.id_paciente %>')">
+                                  <i class="bi bi-pencil me-1"></i>Editar
+                                </button>
+                              <% } %>
                               <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copiarCodigo('<%= p.codigo_paciente %>')">
                                 <i class="bi bi-clipboard me-1"></i>Copiar Código
                               </button>

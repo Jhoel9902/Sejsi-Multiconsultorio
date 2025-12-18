@@ -7,8 +7,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const router = express.Router();
-
-// Configurar multer para subida de estudios
+//multer para subida de estudios admite fotos y pdfs
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadDir = path.join(__dirname, '../..', 'public/uploads/estudios');
 
@@ -41,10 +40,6 @@ const upload = multer({
         }
     }
 });
-
-// =======================================
-// RUTAS: AGREGAR HISTORIAL
-// =======================================
 
 // GET /historial/agregar - Formulario para agregar nuevo historial
 router.get('/agregar', requireAuth, requireRole(['medico']), (req, res) => {
@@ -129,10 +124,6 @@ router.post('/guardar', requireAuth, requireRole(['medico']), async (req, res) =
         res.status(500).json({ success: false, mensaje: 'Error al guardar historial' });
     }
 });
-
-// =======================================
-// RUTAS: CONSULTAR HISTORIAL
-// =======================================
 
 // GET /historial/consultar - Página de consulta
 router.get('/consultar', requireAuth, requireRole(['medico']), (req, res) => {

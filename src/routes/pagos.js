@@ -8,7 +8,8 @@ const router = Router();
 router.get('/pagos', requireAuth, requireRole(['ventanilla']), async (req, res) => {
     try {
         res.render('pagos', {
-            user: req.user
+            user: req.user,
+            title: 'Pagos - Sejsi Multiconsultorio'
         });
     } catch (error) {
         console.error('Error al cargar página de pagos:', error);

@@ -14,6 +14,7 @@ import serviciosRouter from './routes/servicios.js';
 import recetasRouter from './routes/recetas.js';
 import citasRouter from './routes/citas.js';
 import pagosRouter from './routes/pagos.js';
+import reportesRouter from './routes/reportes.js';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -73,6 +74,7 @@ app.use('/historial', recetasRouter);  // Routes in recetas.js start with / (wit
 app.use(serviciosRouter);
 app.use(citasRouter);
 app.use(pagosRouter);
+app.use(reportesRouter);
 
 // 404 - Página no encontrada
 app.use((req, res) => {

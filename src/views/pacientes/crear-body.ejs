@@ -15,20 +15,20 @@
             
             <div class="col-md-6">
               <label class="form-label">Nombre <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="nombre" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
+              <input type="text" class="form-control" name="nombre" value="<%= formData?.nombre || '' %>" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido paterno <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="apellido_paterno" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
+              <input type="text" class="form-control" name="apellido_paterno" value="<%= formData?.apellido_paterno || '' %>" required pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Apellido materno</label>
-              <input type="text" class="form-control" name="apellido_materno" pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]*$" title="Solo letras y espacios" />
+              <input type="text" class="form-control" name="apellido_materno" value="<%= formData?.apellido_materno || '' %>" pattern="^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]*$" title="Solo letras y espacios" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Fecha de nacimiento <span class="text-danger">*</span></label>
-              <input type="date" class="form-control" name="fecha_nacimiento" required />
-              <small class="form-text text-muted">Debe ser mayor de 1 año y menor de 100 años</small>
+              <input type="date" class="form-control" name="fecha_nacimiento" value="<%= formData?.fecha_nacimiento || '' %>" required />
+              <small class="form-text text-muted">Debe ser menor de 100 años</small>
             </div>
 
             <!-- Documentos y contacto -->
@@ -36,19 +36,19 @@
 
             <div class="col-md-6">
               <label class="form-label">Cédula de identidad <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" name="ci" required pattern="^[0-9]{7,8}[A-Z]?$" title="Formato: 7-8 dígitos + letra opcional" placeholder="Ej: 12345678 o 12345678A" />
+              <input type="text" class="form-control" name="ci" value="<%= formData?.ci || '' %>" required pattern="^[0-9]{7,8}[A-Z]?$" title="Formato: 7-8 dígitos + letra opcional" placeholder="Ej: 12345678 o 12345678A" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Correo electrónico</label>
-              <input type="email" class="form-control" name="correo" />
+              <input type="email" class="form-control" name="correo" value="<%= formData?.correo || '' %>" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Teléfono/Celular <span class="text-danger">*</span></label>
-              <input type="tel" class="form-control" name="celular" required pattern="^[0-9]{10,11}$" title="10-11 dígitos sin espacios" placeholder="Ej: 71234567" />
+              <input type="tel" class="form-control" name="celular" value="<%= formData?.celular || '' %>" required pattern="^[0-9]{10,11}$" title="10-11 dígitos sin espacios" placeholder="Ej: 71234567" />
             </div>
             <div class="col-md-6">
               <label class="form-label">Nacionalidad</label>
-              <input type="text" class="form-control" name="nacionalidad" />
+              <input type="text" class="form-control" name="nacionalidad" value="<%= formData?.nacionalidad || '' %>" />
             </div>
 
             <!-- Datos médicos y civiles -->
@@ -58,30 +58,30 @@
               <label class="form-label">Tipo de sangre</label>
               <select class="form-select" name="tipo_sangre">
                 <option value="">-- Seleccionar --</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
+                <option value="O+" <%= formData?.tipo_sangre === 'O+' ? 'selected' : '' %>>O+</option>
+                <option value="O-" <%= formData?.tipo_sangre === 'O-' ? 'selected' : '' %>>O-</option>
+                <option value="A+" <%= formData?.tipo_sangre === 'A+' ? 'selected' : '' %>>A+</option>
+                <option value="A-" <%= formData?.tipo_sangre === 'A-' ? 'selected' : '' %>>A-</option>
+                <option value="B+" <%= formData?.tipo_sangre === 'B+' ? 'selected' : '' %>>B+</option>
+                <option value="B-" <%= formData?.tipo_sangre === 'B-' ? 'selected' : '' %>>B-</option>
+                <option value="AB+" <%= formData?.tipo_sangre === 'AB+' ? 'selected' : '' %>>AB+</option>
+                <option value="AB-" <%= formData?.tipo_sangre === 'AB-' ? 'selected' : '' %>>AB-</option>
               </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Estado civil</label>
               <select class="form-select" name="estado_civil">
                 <option value="">-- Seleccionar --</option>
-                <option value="Soltero/a">Soltero/a</option>
-                <option value="Casado/a">Casado/a</option>
-                <option value="Divorciado/a">Divorciado/a</option>
-                <option value="Viudo/a">Viudo/a</option>
-                <option value="Unión libre">Unión libre</option>
+                <option value="Soltero/a" <%= formData?.estado_civil === 'Soltero/a' ? 'selected' : '' %>>Soltero/a</option>
+                <option value="Casado/a" <%= formData?.estado_civil === 'Casado/a' ? 'selected' : '' %>>Casado/a</option>
+                <option value="Divorciado/a" <%= formData?.estado_civil === 'Divorciado/a' ? 'selected' : '' %>>Divorciado/a</option>
+                <option value="Viudo/a" <%= formData?.estado_civil === 'Viudo/a' ? 'selected' : '' %>>Viudo/a</option>
+                <option value="Unión libre" <%= formData?.estado_civil === 'Unión libre' ? 'selected' : '' %>>Unión libre</option>
               </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Contacto de emergencia</label>
-              <input type="text" class="form-control" name="contacto_emerg" placeholder="Nombre y teléfono" />
+              <input type="text" class="form-control" name="contacto_emerg" value="<%= formData?.contacto_emerg || '' %>" placeholder="Nombre y teléfono" />
             </div>
 
             <!-- Domicilio -->
@@ -89,7 +89,7 @@
 
             <div class="col-12">
               <label class="form-label">Domicilio</label>
-              <input type="text" class="form-control" name="domicilio" />
+              <input type="text" class="form-control" name="domicilio" value="<%= formData?.domicilio || '' %>" />
             </div>
 
             <!-- Antecedentes médicos -->
@@ -97,15 +97,15 @@
 
             <div class="col-12">
               <label class="form-label">Alergias</label>
-              <textarea class="form-control" name="alergias" rows="2"></textarea>
+              <textarea class="form-control" name="alergias" rows="2"><%= formData?.alergias || '' %></textarea>
             </div>
             <div class="col-12">
               <label class="form-label">Enfermedades base</label>
-              <textarea class="form-control" name="enfermedad_base" rows="2"></textarea>
+              <textarea class="form-control" name="enfermedad_base" rows="2"><%= formData?.enfermedad_base || '' %></textarea>
             </div>
             <div class="col-12">
               <label class="form-label">Observaciones</label>
-              <textarea class="form-control" name="observaciones" rows="2"></textarea>
+              <textarea class="form-control" name="observaciones" rows="2"><%= formData?.observaciones || '' %></textarea>
             </div>
 
             <!-- Botones -->

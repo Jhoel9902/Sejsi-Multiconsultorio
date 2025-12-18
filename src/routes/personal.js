@@ -6,14 +6,11 @@ import { uploadPersonal } from '../config/multer.js';
 
 const router = Router();
 
-// GET /personal/registrar - Mostrar formulario de registro (solo admin)
 router.get('/personal/registrar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    // Obtener especialidades para el formulario (si es médico)
     const [especialidades] = await pool.query('CALL sp_esp_listar()');
     const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
 
-    // Obtener roles
     const [roles] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
 
     res.render('personal/registrar', { 
@@ -21,7 +18,8 @@ router.get('/personal/registrar', requireAuth, requireRole(['admin']), async (re
       error: null, 
       success: null,
       especialidades: esps,
-      roles: roles
+      roles: roles,
+      formData: {}
     });
   } catch (err) {
     console.error('Error loading registrar form', err);
@@ -30,12 +28,12 @@ router.get('/personal/registrar', requireAuth, requireRole(['admin']), async (re
       error: 'Error al cargar el formulario', 
       success: null,
       especialidades: [],
-      roles: []
+      roles: [],
+      formData: {}
     });
   }
 });
 
-// POST /personal - Registrar personal (solo admin)
 router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any(), async (req, res) => {
   const {
     ci,
@@ -51,52 +49,44 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     correo,
     contrasena,
     contrasena_confirm,
-    especialidades = [], // Especialidades seleccionadas (array)
+    especialidades = [],
   } = req.body;
 
-  // Cargar especialidades y roles para la vista (en caso de error)
   const [espsData] = await pool.query('CALL sp_esp_listar()');
   const especialidadesDisponibles = Array.isArray(espsData) ? espsData[0] : espsData;
   
   const [rolesData] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
 
-  // Validaciones
   const errors = [];
 
-  // Validar CI
   if (!ci || ci.trim() === '') {
     errors.push('El CI es obligatorio.');
   } else if (!/^[0-9]{7,8}[A-Z]?$/.test(ci)) {
-    errors.push('El CI debe tener 7-8 dígitos más una letra opcional (formato boliviano).');
+    errors.push('El CI debe tener 7-8 dígitos más una letra opcional (copia de carntet).');
   }
 
-  // Validar nombres
   if (!nombres || nombres.trim() === '') {
     errors.push('El nombre es obligatorio.');
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombres)) {
     errors.push('El nombre solo puede contener letras y espacios.');
   }
 
-  // Validar apellido paterno
   if (!apellido_paterno || apellido_paterno.trim() === '') {
     errors.push('El apellido paterno es obligatorio.');
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_paterno)) {
     errors.push('El apellido paterno solo puede contener letras y espacios.');
   }
 
-  // Validar apellido materno si se proporciona
   if (apellido_materno && apellido_materno.trim() !== '' && !/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_materno)) {
     errors.push('El apellido materno solo puede contener letras y espacios.');
   }
 
-  // Validar teléfono
   if (!celular || celular.trim() === '') {
     errors.push('El celular es obligatorio.');
-  } else if (!/^[0-9]{10,11}$/.test(celular.replace(/\D/g, ''))) {
-    errors.push('El celular debe tener 10-11 dígitos.');
+  } else if (!/^(\+\d{1,3}[- ]?)?\d{8,14}$/.test(celular.replace(/\s/g, ''))) {
+    errors.push('El celular debe tener 8-11 dígitos, y opcionalmente código de país.');
   }
 
-  // Validar fecha de nacimiento y edad (mínimo 18 años)
   if (!fecha_nacimiento) {
     errors.push('La fecha de nacimiento es obligatoria.');
   } else {
@@ -115,18 +105,15 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     }
   }
 
-  // Validar fecha de contratación
   if (!fecha_contratacion) {
     errors.push('La fecha de contratación es obligatoria.');
   }
 
-  // Validar correo si se proporciona
   if (correo && correo.trim() !== '') {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(correo)) {
       errors.push('El correo electrónico no es válido.');
     } else {
-      // Validar que el correo sea único
       const [existingEmail] = await pool.query('SELECT COUNT(*) as count FROM tpersonal WHERE correo = ? AND estado = TRUE', [correo]);
       if (existingEmail && existingEmail.length > 0 && existingEmail[0].count > 0) {
         errors.push('Este correo electrónico ya está registrado en el sistema.');
@@ -134,28 +121,25 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     }
   }
 
-  // Validar contraseñas coincidan
   if (contrasena !== contrasena_confirm) {
     errors.push('Las contraseñas no coinciden.');
   }
 
-  // Validar contraseña mínima
-  if (contrasena.length < 6) {
-    errors.push('La contraseña debe tener al menos 6 caracteres.');
+  if (contrasena.length < 8) {
+    errors.push('La contraseña debe tener al menos 8 caracteres.');
   }
 
-  // Si hay errores de validación, devolver formulario
   if (errors.length > 0) {
     return res.status(400).render('personal/registrar', {
       user: req.user,
       error: errors.join(' '),
       success: null,
       especialidades: especialidadesDisponibles,
-      roles: rolesData
+      roles: rolesData,
+      formData: req.body
     });
   }
 
-  // Validar que si es médico, tenga al menos 1 especialidad
   const [rolData] = await pool.query('SELECT nombre_rol FROM trol WHERE id_rol = ?', [id_rol]);
   const rol = Array.isArray(rolData) ? rolData[0] : rolData;
   
@@ -169,16 +153,15 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
         error: 'Un médico debe tener al menos una especialidad.',
         success: null,
         especialidades: especialidadesDisponibles,
-        roles: rolesData
+        roles: rolesData,
+        formData: req.body
       });
     }
   }
 
   try {
-    // Hashear contraseña
     const contrasenaHasheada = await bcrypt.hash(contrasena, 10);
 
-    // Obtener rutas de archivos si existen
     let fotoRuta = null;
     let contratoRuta = null;
 
@@ -190,7 +173,6 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       }
     });
 
-    // Llamar SP para registrar personal
     await pool.query('CALL sp_personal_registrar(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_id, @p_success, @p_msg)', [
       ci,
       nombres,
@@ -213,7 +195,6 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     if (output.success) {
       const idPersonal = output.id;
 
-      // Si es médico, asignar especialidades
       if (rol && rol.nombre_rol === 'medico') {
         const espsArray = Array.isArray(especialidades) ? especialidades : [especialidades];
         const espsFiltered = espsArray.filter(e => e && e.trim());
@@ -258,7 +239,6 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
   }
 });
 
-// GET /personal/gestionar - Listar personal (solo admin)
 router.get('/personal/gestionar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const [result] = await pool.query('CALL sp_personal_listar()');
@@ -271,7 +251,6 @@ router.get('/personal/gestionar', requireAuth, requireRole(['admin']), async (re
   }
 });
 
-// GET /personal/obtener-formulario/:id - Obtener form para editar (AJAX, solo admin)
 router.get('/personal/obtener-formulario/:id', requireAuth, requireRole(['admin']), async (req, res) => {
   const { id } = req.params;
 
@@ -285,7 +264,6 @@ router.get('/personal/obtener-formulario/:id', requireAuth, requireRole(['admin'
 
     const p = rows[0];
 
-    // Obtener roles
     const [roles] = await pool.query('SELECT id_rol, nombre_rol FROM trol');
 
     res.render('personal/editar-modal', { personal: p, roles, layout: false });
@@ -295,7 +273,6 @@ router.get('/personal/obtener-formulario/:id', requireAuth, requireRole(['admin'
   }
 });
 
-// POST /personal/editar/:id - Actualizar personal (solo admin)
 router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadPersonal.any(), async (req, res) => {
   const { id } = req.params;
   const {
@@ -312,43 +289,36 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
     correo,
   } = req.body;
 
-  // Validaciones
   const errors = [];
 
-  // Validar CI
   if (!ci || ci.trim() === '') {
     errors.push('El CI es obligatorio.');
   } else if (!/^[0-9]{7,8}[A-Z]?$/.test(ci)) {
     errors.push('El CI debe tener 7-8 dígitos más una letra opcional (formato boliviano).');
   }
 
-  // Validar nombres
   if (!nombres || nombres.trim() === '') {
     errors.push('El nombre es obligatorio.');
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(nombres)) {
     errors.push('El nombre solo puede contener letras y espacios.');
   }
 
-  // Validar apellido paterno
   if (!apellido_paterno || apellido_paterno.trim() === '') {
     errors.push('El apellido paterno es obligatorio.');
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_paterno)) {
     errors.push('El apellido paterno solo puede contener letras y espacios.');
   }
 
-  // Validar apellido materno si se proporciona
   if (apellido_materno && apellido_materno.trim() !== '' && !/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+$/.test(apellido_materno)) {
     errors.push('El apellido materno solo puede contener letras y espacios.');
   }
 
-  // Validar teléfono
   if (!celular || celular.trim() === '') {
     errors.push('El celular es obligatorio.');
-  } else if (!/^[0-9]{10,11}$/.test(celular.replace(/\D/g, ''))) {
-    errors.push('El celular debe tener 10-11 dígitos.');
+  } else if (!/^(\+\d{1,3}[- ]?)?\d{8,14}$/.test(celular.replace(/\s/g, ''))) {
+    errors.push('El celular debe tener 8-11 dígitos, y opcionalmente código de país.');
   }
 
-  // Validar fecha de nacimiento y edad (mínimo 18 años)
   if (!fecha_nacimiento) {
     errors.push('La fecha de nacimiento es obligatoria.');
   } else {
@@ -367,18 +337,15 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
     }
   }
 
-  // Validar fecha de contratación
   if (!fecha_contratacion) {
     errors.push('La fecha de contratación es obligatoria.');
   }
 
-  // Validar correo si se proporciona
   if (correo && correo.trim() !== '') {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(correo)) {
       errors.push('El correo electrónico no es válido.');
     } else {
-      // Validar que el correo sea único (excepto si es el mismo correo del usuario que se edita)
       const [personalActual] = await pool.query('SELECT correo FROM tpersonal WHERE id_personal = ?', [id]);
       const correoAnterior = personalActual && personalActual.length > 0 ? personalActual[0].correo : null;
       
@@ -391,13 +358,11 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
     }
   }
 
-  // Si hay errores de validación
   if (errors.length > 0) {
     return res.status(400).json({ success: false, error: errors.join(' ') });
   }
 
   try {
-    // Obtener rutas de archivos si existen
     let fotoRuta = null;
     let contratoRuta = null;
 
@@ -411,7 +376,6 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
       });
     }
 
-    // Llamar SP de actualización
     await pool.query('CALL sp_personal_actualizar(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_success, @p_msg)', [
       id,
       ci,
@@ -442,17 +406,14 @@ router.post('/personal/editar/:id', requireAuth, requireRole(['admin']), uploadP
   }
 });
 
-// GET /personal/medicos - Listar médicos disponibles (admin, ventanilla)
 router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   try {
-    const q = req.query.q || ''; // Buscar por CI o nombre
+    const q = req.query.q || '';
     let medicos = [];
 
-    // Obtener datos de médicos
     const [result] = await pool.query('CALL sp_personal_listar_medicos()');
     medicos = Array.isArray(result) ? result[0] : result;
 
-    // Filtrar si hay búsqueda
     if (q.trim().length > 0) {
       const queryLower = q.toLowerCase().trim();
       medicos = medicos.filter(m => {
@@ -461,16 +422,13 @@ router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']
       });
     }
 
-    // Obtener especialidades para el filtro
     const [especialidades] = await pool.query('CALL sp_esp_listar()');
     const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
 
-    // Si es búsqueda AJAX, devolver JSON
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       return res.json({ medicos });
     }
 
-    // Si no es AJAX, renderizar página completa
     res.render('personal/medicos', { user: req.user, medicos, especialidades: esps, termino_busqueda: q });
   } catch (err) {
     console.error('Error fetching medicos', err);
@@ -481,7 +439,6 @@ router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']
   }
 });
 
-// GET /personal/medico/:id - Ver detalles de médico (AJAX, admin, ventanilla)
 router.get('/personal/medico/:id', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   const { id } = req.params;
 
@@ -501,36 +458,18 @@ router.get('/personal/medico/:id', requireAuth, requireRole(['admin', 'ventanill
   }
 });
 
-// GET /personal/mi-perfil - Obtener perfil del usuario en sesión (AJAX)
 router.get('/personal/mi-perfil', requireAuth, async (req, res) => {
   const userId = req.user.id_personal;
 
   try {
-    const [rows] = await pool.query(`
-      SELECT 
-        p.id_personal,
-        p.nombres,
-        p.apellido_paterno,
-        p.apellido_materno,
-        p.cargo,
-        p.correo,
-        p.celular,
-        p.foto_perfil,
-        r.nombre_rol,
-        GROUP_CONCAT(e.nombre SEPARATOR ', ') AS especialidades
-      FROM tpersonal p
-      LEFT JOIN trol r ON p.id_rol = r.id_rol
-      LEFT JOIN tpersonal_especialidad pe ON p.id_personal = pe.id_personal AND pe.estado = TRUE
-      LEFT JOIN tespecialidad e ON pe.id_especialidad = e.id_especialidad AND e.estado = TRUE
-      WHERE p.id_personal = ?
-      GROUP BY p.id_personal
-    `, [userId]);
+    const [rows] = await pool.query('CALL sp_personal_obtener_sesion(?)', [userId]);
+    const result = Array.isArray(rows) ? rows[0] : rows;
 
-    if (!rows || rows.length === 0) {
+    if (!result || result.length === 0) {
       return res.status(404).json({ error: 'Datos del usuario no encontrados' });
     }
 
-    const perfil = rows[0];
+    const perfil = result[0];
     res.render('personal/perfil-usuario', { perfil, layout: false });
   } catch (err) {
     console.error('Error fetching user profile', err);
@@ -538,24 +477,19 @@ router.get('/personal/mi-perfil', requireAuth, async (req, res) => {
   }
 });
 
-// GET /personal/contratos - Ver contratos de todo el personal (admin)
 router.get('/personal/contratos', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const [personalContratos] = await pool.query(`
-      SELECT 
-        id_personal,
-        CONCAT(nombres, ' ', apellido_paterno, ' ', COALESCE(apellido_materno, '')) AS nombre_completo,
-        ci,
-        cargo,
-        fecha_contratacion,
-        fecha_actualizacion,
-        archivo_contrato,
-        estado,
-        CASE WHEN estado = 1 THEN 'Activo' ELSE 'Inactivo' END AS estado_label
-      FROM tpersonal
-      WHERE estado = 1
-      ORDER BY nombres, apellido_paterno
-    `);
+    const [result] = await pool.query('CALL sp_personal_listar()');
+    const personal = Array.isArray(result) ? result[0] : result;
+
+    console.log('SP Result:', JSON.stringify(personal, null, 2));
+
+    const personalContratos = personal.filter(p => p.estado === 1).map(p => ({
+      ...p,
+      estado_label: p.estado === 1 ? 'Activo' : 'Inactivo'
+    }));
+
+    console.log('Personal Contratos:', JSON.stringify(personalContratos, null, 2));
 
     res.render('personal/contratos', { 
       user: req.user, 
