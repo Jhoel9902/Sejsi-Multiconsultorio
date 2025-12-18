@@ -5,27 +5,51 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 const router = Router();
 
 // GET /citas/crear - Mostrar formulario de crear cita
-router.get('/citas/crear', requireAuth, requireRole(['ventanilla']), async (req, res) => {
+router.get('/citas/crear', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         // Obtener lista de pacientes activos
-        const [pacientes] = await pool.query(
-            'SELECT id_paciente, CONCAT(nombre, " ", apellido_paterno, " ", COALESCE(apellido_materno, "")) AS nombre_paciente, codigo_paciente FROM tpaciente WHERE estado = 1 ORDER BY nombre ASC'
+        const [pacientesList] = await pool.query(
+            'CALL sp_pac_listar(?)',
+            ['activos']
         );
+
+        const pacientes = pacientesList && pacientesList.length > 0 ? pacientesList[0] : [];
 
         // Obtener lista de médicos activos
-        const [medicos] = await pool.query(
-            'SELECT id_personal, CONCAT(nombres, " ", apellido_paterno, " ", COALESCE(apellido_materno, "")) AS nombre_medico FROM tpersonal WHERE estado = 1 AND id_rol IN (SELECT id_rol FROM trol WHERE nombre_rol = "medico") ORDER BY nombres ASC'
+        const [medicosList] = await pool.query(
+            'CALL sp_personal_listar_medicos()'
         );
 
-        // Obtener lista de servicios activos
-        const [servicios] = await pool.query(
-            'SELECT id_servicio, nombre, precio FROM tservicio WHERE estado = 1 ORDER BY nombre ASC'
+        const medicos = medicosList && medicosList.length > 0 ? medicosList[0].map(medico => ({
+            id_personal: medico.id_personal,
+            nombre_medico: `${medico.nombres} ${medico.apellido_paterno}`,
+            especialidades: medico.especialidades ? medico.especialidades.split(', ') : []
+        })) : [];
+
+        // Obtener especialidades únicas de los médicos
+        const especialidadesSet = new Set();
+        medicos.forEach(medico => {
+            medico.especialidades.forEach(esp => especialidadesSet.add(esp));
+        });
+        const especialidades = Array.from(especialidadesSet).sort();
+
+        // Obtener servicios con sus especialidades (nombres, no IDs)
+        const [serviciosResult] = await pool.query(
+            'SELECT s.id_servicio, s.nombre, s.precio, GROUP_CONCAT(e.nombre SEPARATOR ",") as especialidades_nombres FROM tservicio s LEFT JOIN tservicio_especialidad se ON s.id_servicio = se.id_servicio AND se.estado = 1 LEFT JOIN tespecialidad e ON se.id_especialidad = e.id_especialidad WHERE s.estado = 1 GROUP BY s.id_servicio ORDER BY s.nombre ASC'
         );
+
+        const servicios = serviciosResult ? serviciosResult.map(s => ({
+            id_servicio: s.id_servicio,
+            nombre: s.nombre,
+            precio: s.precio,
+            especialidades: s.especialidades_nombres && s.especialidades_nombres.trim() !== '' ? s.especialidades_nombres.split(',') : []
+        })) : [];
 
         res.render('citas/crear', {
             user: req.user,
             pacientes,
             medicos,
+            especialidades,
             servicios
         });
     } catch (error) {
@@ -34,8 +58,41 @@ router.get('/citas/crear', requireAuth, requireRole(['ventanilla']), async (req,
     }
 });
 
+// GET /citas/buscar-paciente - API para buscar pacientes
+router.get('/citas/buscar-paciente', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
+    try {
+        const { termino } = req.query;
+
+        if (!termino || termino.trim() === '') {
+            return res.json({ success: true, pacientes: [] });
+        }
+
+        const [resultados] = await pool.query(
+            'CALL sp_pac_buscar(?, ?)',
+            [termino, true]
+        );
+
+        const pacientes = resultados && resultados.length > 0 ? resultados[0] : [];
+
+        res.json({
+            success: true,
+            pacientes: pacientes.map(p => ({
+                id_paciente: p.id_paciente,
+                nombre: p.nombre,
+                apellido_paterno: p.apellido_paterno,
+                apellido_materno: p.apellido_materno || '',
+                codigo_paciente: p.codigo_paciente,
+                ci: p.ci
+            }))
+        });
+    } catch (error) {
+        console.error('Error al buscar paciente:', error);
+        res.status(500).json({ success: false, mensaje: 'Error al buscar paciente' });
+    }
+});
+
 // POST /citas - Crear nueva cita
-router.post('/citas', requireAuth, requireRole(['ventanilla']), async (req, res) => {
+router.post('/citas', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         const { id_paciente, id_personal, id_servicio, fecha_cita, hora_cita, motivo_consulta, observaciones } = req.body;
 
@@ -137,11 +194,16 @@ router.post('/citas', requireAuth, requireRole(['ventanilla']), async (req, res)
 });
 
 // GET /citas/agenda - Mostrar página de agenda con filtros
-router.get('/citas/agenda', requireAuth, requireRole(['ventanilla', 'medico']), async (req, res) => {
+router.get('/citas/agenda', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
     try {
-        const [medicos] = await pool.query(
-            'SELECT id_personal, CONCAT(nombres, " ", apellido_paterno) AS nombre_medico FROM tpersonal WHERE estado = 1 AND id_rol IN (SELECT id_rol FROM trol WHERE nombre_rol = "medico") ORDER BY nombres ASC'
+        const [medicosList] = await pool.query(
+            'CALL sp_personal_listar_medicos()'
         );
+
+        const medicos = medicosList && medicosList.length > 0 ? medicosList[0].map(medico => ({
+            id_personal: medico.id_personal,
+            nombre_medico: `${medico.nombres} ${medico.apellido_paterno}`
+        })) : [];
 
         res.render('citas/agenda', {
             user: req.user,
@@ -154,7 +216,7 @@ router.get('/citas/agenda', requireAuth, requireRole(['ventanilla', 'medico']), 
 });
 
 // GET /citas/agenda/listar - API para obtener citas con filtros
-router.get('/citas/agenda/listar', requireAuth, requireRole(['ventanilla', 'medico']), async (req, res) => {
+router.get('/citas/agenda/listar', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
     try {
         let { fecha_inicio, fecha_fin, id_personal, estado } = req.query;
 
@@ -173,7 +235,7 @@ router.get('/citas/agenda/listar', requireAuth, requireRole(['ventanilla', 'medi
         if (req.user.nombre_rol === 'medico') {
             id_personal = req.user.id_personal;
         } else if (!id_personal) {
-            // Si es ventanilla y no especifica médico, mostrar error
+            // Si es ventanilla o admin y no especifica médico, mostrar error
             return res.status(400).json({ success: false, mensaje: 'Debe seleccionar un médico' });
         }
 
@@ -204,7 +266,7 @@ router.get('/citas/agenda/listar', requireAuth, requireRole(['ventanilla', 'medi
 });
 
 // GET /citas/:id_cita - Obtener detalles de una cita
-router.get('/citas/:id_cita', requireAuth, requireRole(['ventanilla', 'medico']), async (req, res) => {
+router.get('/citas/:id_cita', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
     try {
         const { id_cita } = req.params;
 
@@ -252,7 +314,7 @@ router.get('/citas/:id_cita/reprogramar', requireAuth, requireRole(['ventanilla'
 });
 
 // POST /citas/:id_cita/reprogramar - Reprogramar cita
-router.post('/citas/:id_cita/reprogramar', requireAuth, requireRole(['ventanilla']), async (req, res) => {
+router.post('/citas/:id_cita/reprogramar', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         const { id_cita } = req.params;
         const { fecha_nueva, hora_nueva } = req.body;
@@ -312,7 +374,7 @@ router.post('/citas/:id_cita/reprogramar', requireAuth, requireRole(['ventanilla
 });
 
 // POST /citas/:id_cita/cancelar - Cancelar cita
-router.post('/citas/:id_cita/cancelar', requireAuth, requireRole(['ventanilla']), async (req, res) => {
+router.post('/citas/:id_cita/cancelar', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         const { id_cita } = req.params;
 
@@ -385,7 +447,7 @@ router.get('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['venta
 });
 
 // POST /citas/:id_cita/marcar-asistencia - Marcar cita como completada
-router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['ventanilla']), async (req, res) => {
+router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         const { id_cita } = req.params;
         const { id_aseguradora } = req.body;

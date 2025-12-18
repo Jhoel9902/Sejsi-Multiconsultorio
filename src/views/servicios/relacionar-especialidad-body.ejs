@@ -1,0 +1,161 @@
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Relacionar Especialidad con Servicio</h5>
+      </div>
+      <div class="card-body">
+        <!-- Mensajes de alerta -->
+        <% if (error) { %>
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-exclamation-circle me-2"></i>Error:</strong> <%= error %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        <% } %>
+
+        <% if (success) { %>
+          <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <strong><i class="bi bi-check-circle me-2"></i>Éxito:</strong> <%= success %>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        <% } %>
+
+        <!-- Formulario de asignación -->
+        <form method="post" action="/servicios/asignar-especialidad" class="mb-5">
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="id_servicio" class="form-label">Servicio <span class="text-danger">*</span></label>
+              <select class="form-select" id="id_servicio" name="id_servicio" required onchange="cargarEspecialidades()">
+                <option value="">-- Seleccionar Servicio --</option>
+                <% servicios.forEach(s => { %>
+                  <option value="<%= s.id_servicio %>"><%= s.nombre %> (Bs. <%= s.precio %>)</option>
+                <% }); %>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label for="id_especialidad" class="form-label">Especialidad <span class="text-danger">*</span></label>
+              <select class="form-select" id="id_especialidad" name="id_especialidad" required>
+                <option value="">-- Seleccionar Especialidad --</option>
+                <% especialidades.forEach(e => { %>
+                  <option value="<%= e.id_especialidad %>"><%= e.nombre %></option>
+                <% }); %>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-link-45deg me-2"></i>Asignar Especialidad
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <!-- Sección para ver especialidades asignadas -->
+        <div class="card mt-4">
+          <div class="card-header bg-light">
+            <h6 class="mb-0"><i class="bi bi-list-check me-2"></i>Especialidades Asignadas al Servicio</h6>
+          </div>
+          <div class="card-body">
+            <div id="especialidadesContainer">
+              <p class="text-muted">Selecciona un servicio para ver sus especialidades asignadas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const servicioSelect = document.getElementById('id_servicio');
+  const especialidadFilter = document.getElementById('id_especialidad');
+  const especialidadesContainer = document.getElementById('especialidadesContainer');
+
+  async function cargarEspecialidades() {
+    const idServicio = servicioSelect.value;
+    
+    if (!idServicio) {
+      especialidadesContainer.innerHTML = '<p class="text-muted">Selecciona un servicio para ver sus especialidades asignadas</p>';
+      return;
+    }
+
+    try {
+      const response = await fetch(`/servicios/obtener-especialidades/${idServicio}`);
+      const data = await response.json();
+
+      if (data.success && data.especialidades.length > 0) {
+        let html = `
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Especialidad</th>
+                  <th>Descripción</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+
+        data.especialidades.forEach(e => {
+          html += `
+            <tr>
+              <td><strong>${e.nombre_especialidad}</strong></td>
+              <td>${e.descripcion || '-'}</td>
+              <td>
+                <button type="button" class="btn btn-sm btn-danger" onclick="quitarEspecialidad('${e.id_servicio}', '${e.id_especialidad}', '${e.nombre_especialidad}')">
+                  <i class="bi bi-trash me-1"></i>Quitar
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `
+              </tbody>
+            </table>
+          </div>
+        `;
+
+        especialidadesContainer.innerHTML = html;
+      } else {
+        especialidadesContainer.innerHTML = '<p class="text-muted">No hay especialidades asignadas a este servicio</p>';
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      especialidadesContainer.innerHTML = '<p class="text-danger">Error al cargar especialidades</p>';
+    }
+  }
+
+  async function quitarEspecialidad(idServicio, idEspecialidad, nombreEspecialidad) {
+    if (!confirm(`¿Deseas quitar la especialidad "${nombreEspecialidad}" de este servicio?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/servicios/quitar-especialidad', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id_servicio: idServicio,
+          id_especialidad: idEspecialidad
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert('Especialidad removida exitosamente');
+        cargarEspecialidades();
+      } else {
+        alert('Error: ' + data.mensaje);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al quitar especialidad');
+    }
+  }
+</script>

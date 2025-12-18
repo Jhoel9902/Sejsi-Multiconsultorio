@@ -3147,6 +3147,113 @@ BEGIN
         SET p_msg = 'Estado actualizado exitosamente';
     END IF;
 END//
+DELIMITER //
+CREATE PROCEDURE `sp_srv_asignar_especialidad`(
+    IN p_id_servicio CHAR(36),
+    IN p_id_especialidad CHAR(36),
+    OUT p_success BOOLEAN,
+    OUT p_msg VARCHAR(255)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_msg = 'Error al asignar especialidad al servicio';
+    END;
+    
+    IF NOT EXISTS(SELECT 1 FROM tservicio WHERE id_servicio = p_id_servicio) THEN
+        SET p_success = FALSE;
+        SET p_msg = 'Servicio no encontrado';
+    ELSEIF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
+        SET p_success = FALSE;
+        SET p_msg = 'Especialidad no encontrada';
+    ELSEIF EXISTS(SELECT 1 FROM tservicio_especialidad WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad AND estado = 1) THEN
+        SET p_success = FALSE;
+        SET p_msg = 'Esta especialidad ya está asignada a este servicio';
+    ELSE
+        -- Si existe pero está inactiva, reactivarla
+        IF EXISTS(SELECT 1 FROM tservicio_especialidad WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad) THEN
+            UPDATE tservicio_especialidad
+            SET estado = 1
+            WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad;
+        ELSE
+            INSERT INTO tservicio_especialidad (id_servicio, id_especialidad, estado)
+            VALUES (p_id_servicio, p_id_especialidad, 1);
+        END IF;
+        
+        SET p_success = TRUE;
+        SET p_msg = 'Especialidad asignada al servicio exitosamente';
+    END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_srv_quitar_especialidad`(
+    IN p_id_servicio CHAR(36),
+    IN p_id_especialidad CHAR(36),
+    OUT p_success BOOLEAN,
+    OUT p_msg VARCHAR(255)
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_msg = 'Error al quitar especialidad del servicio';
+    END;
+    
+    IF NOT EXISTS(SELECT 1 FROM tservicio_especialidad WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad) THEN
+        SET p_success = FALSE;
+        SET p_msg = 'La especialidad no estaba asignada a este servicio';
+    ELSE
+        UPDATE tservicio_especialidad
+        SET estado = 0
+        WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad;
+        
+        SET p_success = TRUE;
+        SET p_msg = 'Especialidad removida del servicio exitosamente';
+    END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_srv_obtener_especialidades`(
+    IN p_id_servicio CHAR(36)
+)
+BEGIN
+    SELECT 
+        se.id_servicio_especialidad,
+        se.id_servicio,
+        se.id_especialidad,
+        e.nombre AS nombre_especialidad,
+        e.descripcion,
+        se.estado,
+        se.fecha_creacion
+    FROM tservicio_especialidad se
+    INNER JOIN tespecialidad e ON se.id_especialidad = e.id_especialidad
+    WHERE se.id_servicio = p_id_servicio
+    ORDER BY e.nombre ASC;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_srv_listar_disponibles_por_especialidad`(
+    IN p_id_especialidad CHAR(36)
+)
+BEGIN
+    SELECT 
+        se.id_servicio_especialidad,
+        se.id_servicio,
+        s.nombre AS nombre_servicio,
+        s.precio,
+        s.descripcion,
+        se.estado
+    FROM tservicio_especialidad se
+    INNER JOIN tservicio s ON se.id_servicio = s.id_servicio
+    WHERE se.id_especialidad = p_id_especialidad AND se.estado = 1 AND s.estado = 1
+    ORDER BY s.nombre ASC;
+END//
+DELIMITER ;
+
 DELIMITER ;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

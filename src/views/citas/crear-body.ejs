@@ -7,16 +7,31 @@
             <div class="card-body">
                 <form id="formCrearCita">
                     <div class="row">
-                        <!-- Seleccionar Paciente -->
+                        <!-- Buscar Paciente -->
+                        <div class="col-md-12 mb-3">
+                            <label for="paciente-search" class="form-label">Buscar Paciente *</label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control" id="paciente-search" placeholder="Escribe nombre, CI o código..." autocomplete="off">
+                                <div class="dropdown-menu w-100" id="paciente-dropdown" style="position: absolute; top: 100%; left: 0; max-height: 300px; overflow-y: auto; display: none;">
+                                </div>
+                            </div>
+                            <input type="hidden" id="id_paciente" name="id_paciente" required>
+                            <small class="text-muted">Busca y selecciona el paciente</small>
+                            <div id="paciente-selected" style="display: none; margin-top: 0.5rem;">
+                                <span class="badge bg-success">✓ <span id="selected-paciente-name"></span></span>
+                            </div>
+                        </div>
+
+                        <!-- Filtrar por Especialidad -->
                         <div class="col-md-6 mb-3">
-                            <label for="id_paciente" class="form-label">Paciente *</label>
-                            <select class="form-select" id="id_paciente" name="id_paciente" required>
-                                <option value="">-- Seleccionar Paciente --</option>
-                                <% pacientes.forEach(p => { %>
-                                    <option value="<%= p.id_paciente %>"><%= p.nombre_paciente %> (<%= p.codigo_paciente %>)</option>
+                            <label for="especialidad-filter" class="form-label">Especialidad</label>
+                            <select class="form-select" id="especialidad-filter">
+                                <option value="">-- Todas las especialidades --</option>
+                                <% especialidades.forEach(esp => { %>
+                                    <option value="<%= esp %>"><%= esp %></option>
                                 <% }); %>
                             </select>
-                            <small class="text-muted">Selecciona el paciente para agendar la cita</small>
+                            <small class="text-muted">Filtra médicos por especialidad</small>
                         </div>
 
                         <!-- Seleccionar Médico -->
@@ -25,7 +40,7 @@
                             <select class="form-select" id="id_personal" name="id_personal" required>
                                 <option value="">-- Seleccionar Médico --</option>
                                 <% medicos.forEach(m => { %>
-                                    <option value="<%= m.id_personal %>"><%= m.nombre_medico %></option>
+                                    <option value="<%= m.id_personal %>" data-especialidades="<%= m.especialidades.join(',') %>"><%= m.nombre_medico %></option>
                                 <% }); %>
                             </select>
                             <small class="text-muted">Selecciona el médico que atenderá la cita</small>
@@ -37,7 +52,7 @@
                             <select class="form-select" id="id_servicio" name="id_servicio" required>
                                 <option value="">-- Seleccionar Servicio --</option>
                                 <% servicios.forEach(s => { %>
-                                    <option value="<%= s.id_servicio %>"><%= s.nombre %> (Bs. <%= s.precio %>)</option>
+                                    <option value="<%= s.id_servicio %>" data-especialidades="<%= (s.especialidades && s.especialidades.length > 0) ? s.especialidades.join(',') : '' %>"><%= s.nombre %> (Bs. <%= s.precio %>)</option>
                                 <% }); %>
                             </select>
                             <small class="text-muted">Selecciona el tipo de servicio</small>
@@ -103,6 +118,91 @@
                 </div>
 
                 <script>
+                    const medicosList = <%- JSON.stringify(medicos) %>;
+                    let selectedPacienteId = null;
+
+                    // Búsqueda de pacientes
+                    const pacienteSearch = document.getElementById('paciente-search');
+                    const pacienteDropdown = document.getElementById('paciente-dropdown');
+
+                    pacienteSearch.addEventListener('input', async (e) => {
+                        const termino = e.target.value.trim();
+                        
+                        if (termino.length < 2) {
+                            pacienteDropdown.style.display = 'none';
+                            return;
+                        }
+
+                        try {
+                            const response = await fetch(`/citas/buscar-paciente?termino=${encodeURIComponent(termino)}`);
+                            const data = await response.json();
+
+                            if (data.success && data.pacientes.length > 0) {
+                                pacienteDropdown.innerHTML = data.pacientes.map(p => `
+                                    <button type="button" class="dropdown-item" onclick="seleccionarPaciente('${p.id_paciente}', '${p.nombre} ${p.apellido_paterno}${p.apellido_materno ? ' ' + p.apellido_materno : ''} (${p.codigo_paciente})')">
+                                        <strong>${p.nombre} ${p.apellido_paterno}</strong><br>
+                                        <small>CI: ${p.ci} | Código: ${p.codigo_paciente}</small>
+                                    </button>
+                                `).join('');
+                                pacienteDropdown.style.display = 'block';
+                            } else {
+                                pacienteDropdown.innerHTML = '<span class="dropdown-item text-muted">No se encontraron pacientes</span>';
+                                pacienteDropdown.style.display = 'block';
+                            }
+                        } catch (error) {
+                            console.error('Error al buscar pacientes:', error);
+                        }
+                    });
+
+                    document.addEventListener('click', (e) => {
+                        if (e.target !== pacienteSearch) {
+                            pacienteDropdown.style.display = 'none';
+                        }
+                    });
+
+                    function seleccionarPaciente(id, nombre) {
+                        selectedPacienteId = id;
+                        document.getElementById('id_paciente').value = id;
+                        pacienteSearch.value = nombre;
+                        document.getElementById('paciente-selected').style.display = 'block';
+                        document.getElementById('selected-paciente-name').textContent = nombre;
+                        pacienteDropdown.style.display = 'none';
+                    }
+
+                    // Filtrar médicos por especialidad
+                    const especialidadFilter = document.getElementById('especialidad-filter');
+                    const medicoSelect = document.getElementById('id_personal');
+                    const servicioSelect = document.getElementById('id_servicio');
+                    const serviciosList = <%- JSON.stringify(servicios) %>;
+
+                    especialidadFilter.addEventListener('change', () => {
+                        const especialidadSeleccionada = especialidadFilter.value;
+                        
+                        medicoSelect.innerHTML = '<option value="">-- Seleccionar Médico --</option>';
+                        servicioSelect.innerHTML = '<option value="">-- Seleccionar Servicio --</option>';
+                        
+                        medicosList.forEach(medico => {
+                            if (!especialidadSeleccionada || medico.especialidades.includes(especialidadSeleccionada)) {
+                                const option = document.createElement('option');
+                                option.value = medico.id_personal;
+                                option.textContent = medico.nombre_medico;
+                                option.setAttribute('data-especialidades', medico.especialidades.join(','));
+                                medicoSelect.appendChild(option);
+                            }
+                        });
+
+                        // Filtrar servicios por especialidad
+                        serviciosList.forEach(servicio => {
+                            if (!especialidadSeleccionada || (servicio.especialidades && servicio.especialidades.length > 0 && servicio.especialidades.includes(especialidadSeleccionada))) {
+                                const option = document.createElement('option');
+                                option.value = servicio.id_servicio;
+                                option.textContent = `${servicio.nombre} (Bs. ${servicio.precio})`;
+                                option.setAttribute('data-especialidades', (servicio.especialidades && servicio.especialidades.length > 0) ? servicio.especialidades.join(',') : '');
+                                servicioSelect.appendChild(option);
+                            }
+                        });
+                    });
+
                     // Validar formato de fecha (DD/MM/YYYY)
                     document.getElementById('fecha_cita').addEventListener('blur', function() {
                         const regex = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[012])\/\d{4}$/;

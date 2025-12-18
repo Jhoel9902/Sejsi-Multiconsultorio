@@ -205,4 +205,119 @@ router.get('/servicios/consultar/:id', requireAuth, requireRole(['admin', 'venta
     }
 });
 
+// GET /servicios/relacionar-especialidad - Mostrar página para relacionar especialidades (admin solo)
+router.get('/servicios/relacionar-especialidad', requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+        // Obtener lista de servicios activos
+        const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+        const serviciosList = Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [];
+
+        // Obtener lista de especialidades activas
+        const [especialidades] = await pool.query('CALL sp_esp_listar()');
+        const especialidadesList = Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [];
+
+        res.render('servicios/relacionar-especialidad', {
+            title: 'Relacionar Especialidad con Servicio',
+            user: req.user,
+            servicios: serviciosList,
+            especialidades: especialidadesList,
+            error: null,
+            success: null
+        });
+    } catch (error) {
+        console.error('Error al cargar formulario:', error);
+        res.status(500).render('error', { message: 'Error al cargar el formulario' });
+    }
+});
+
+// POST /servicios/asignar-especialidad - Asignar especialidad a servicio
+router.post('/servicios/asignar-especialidad', requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+        const { id_servicio, id_especialidad } = req.body;
+
+        if (!id_servicio || !id_especialidad) {
+            const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+            const [especialidades] = await pool.query('CALL sp_esp_listar()');
+            
+            return res.render('servicios/relacionar-especialidad', {
+                title: 'Relacionar Especialidad con Servicio',
+                user: req.user,
+                servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
+                especialidades: Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [],
+                error: 'Debe seleccionar un servicio y una especialidad',
+                success: null
+            });
+        }
+
+        await pool.query(
+            'CALL sp_srv_asignar_especialidad(?, ?, @p_success, @p_msg)',[id_servicio, id_especialidad]
+        );
+
+        const [[result]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje');
+
+        if (result.success) {
+            const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+            const [especialidades] = await pool.query('CALL sp_esp_listar()');
+            
+            return res.render('servicios/relacionar-especialidad', {
+                title: 'Relacionar Especialidad con Servicio',
+                user: req.user,
+                servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
+                especialidades: Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [],
+                error: null,
+                success: result.mensaje
+            });
+        } else {
+            const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+            const [especialidades] = await pool.query('CALL sp_esp_listar()');
+            
+            return res.render('servicios/relacionar-especialidad', {
+                title: 'Relacionar Especialidad con Servicio',
+                user: req.user,
+                servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
+                especialidades: Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [],
+                error: result.mensaje,
+                success: null
+            });
+        }
+    } catch (error) {
+        console.error('Error al asignar especialidad:', error);
+        res.status(500).render('error', { message: 'Error al asignar especialidad' });
+    }
+});
+
+// GET /servicios/obtener-especialidades/:id - Obtener especialidades de un servicio (API)
+router.get('/servicios/obtener-especialidades/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [result] = await pool.query('CALL sp_srv_obtener_especialidades(?)', [id]);
+        const especialidades = Array.isArray(result) && result.length > 0 ? result[0] : [];
+
+        res.json({ success: true, especialidades });
+    } catch (error) {
+        console.error('Error al obtener especialidades:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener especialidades' });
+    }
+});
+
+// POST /servicios/quitar-especialidad - Quitar especialidad de servicio (API)
+router.post('/servicios/quitar-especialidad', requireAuth, requireRole(['admin']), async (req, res) => {
+    try {
+        const { id_servicio, id_especialidad } = req.body;
+
+        await pool.query(
+            'CALL sp_srv_quitar_especialidad(?, ?, @p_success, @p_msg)',
+            [id_servicio, id_especialidad]
+        );
+
+        const [[result]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje');
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error al quitar especialidad:', error);
+        res.status(500).json({ success: false, message: 'Error al quitar especialidad' });
+    }
+});
+
 export default router;

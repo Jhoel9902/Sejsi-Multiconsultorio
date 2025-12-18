@@ -89,8 +89,16 @@ router.get('/pacientes/detalles/:id', requireAuth, requireRole(['admin', 'ventan
   }
 });
 
-router.get('/pacientes/crear', requireAuth, requireRole(['admin', 'ventanilla']), (req, res) => {
-  res.render('pacientes/crear', { user: req.user, error: null, formData: {} });
+router.get('/pacientes/crear', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
+  try {
+    const [result] = await pool.query('CALL sp_listar_aseguradoras()');
+    const aseguradoras = result && result.length > 0 ? result[0] : [];
+    
+    res.render('pacientes/crear', { user: req.user, error: null, formData: {}, aseguradoras });
+  } catch (error) {
+    console.error('Error al cargar aseguradoras:', error);
+    res.render('pacientes/crear', { user: req.user, error: null, formData: {}, aseguradoras: [] });
+  }
 });
 
 router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
@@ -110,6 +118,8 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     observaciones,
     celular,
     correo,
+    id_aseguradora,
+    numero_poliza,
   } = req.body;
 
   const errors = [];
@@ -212,6 +222,19 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
           );
         } catch (err) {
           console.error('Error al crear historial vacío:', err);
+        }
+
+        // Asignar aseguradora si se proporciona
+        if (id_aseguradora && id_aseguradora.trim() !== '') {
+          try {
+            await pool.query(
+              'CALL sp_asignar_aseguradora_paciente(?, ?, ?)',
+              [id_paciente, id_aseguradora, numero_poliza || null]
+            );
+          } catch (err) {
+            console.error('Error al asignar aseguradora:', err);
+            // No es fatal, continuar
+          }
         }
       }
       

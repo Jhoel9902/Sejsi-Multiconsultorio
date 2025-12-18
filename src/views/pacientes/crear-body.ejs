@@ -108,6 +108,27 @@
               <textarea class="form-control" name="observaciones" rows="2"><%= formData?.observaciones || '' %></textarea>
             </div>
 
+            <!-- Aseguradora (opcional) -->
+            <h6 class="col-12 mt-3 text-muted">Información de Aseguradora (Opcional)</h6>
+
+            <div class="col-md-6">
+              <label class="form-label">Aseguradora</label>
+              <select class="form-select" name="id_aseguradora">
+                <option value="">-- Sin aseguradora --</option>
+                <% aseguradoras.forEach(a => { %>
+                  <option value="<%= a.id_aseguradora %>" <%= formData?.id_aseguradora === a.id_aseguradora ? 'selected' : '' %>>
+                    <%= a.nombre %> (<%= a.porcentaje_cobertura %>% cobertura)
+                  </option>
+                <% }); %>
+              </select>
+              <small class="form-text text-muted">Selecciona una aseguradora si el paciente cuenta con una</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Número de Póliza</label>
+              <input type="text" class="form-control" name="numero_poliza" value="<%= formData?.numero_poliza || '' %>" placeholder="Número de póliza (opcional)" />
+              <small class="form-text text-muted">Número de la póliza de la aseguradora</small>
+            </div>
+
             <!-- Botones -->
             <div class="col-12 mt-4">
               <button type="submit" class="btn btn-primary me-2"><i class="bi bi-check-lg me-1"></i>Registrar</button>
