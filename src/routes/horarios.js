@@ -4,6 +4,62 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
+// Intentar crear el procedimiento almacenado `sp_horario_crear` en tiempo de ejecución
+async function ensureSpHorarioCrear() {
+  try {
+    // Verificar si el procedimiento ya existe
+    const [rows] = await pool.query("SELECT ROUTINE_NAME FROM information_schema.routines WHERE ROUTINE_SCHEMA = ? AND ROUTINE_NAME = 'sp_horario_crear' LIMIT 1", [process.env.DB_NAME || 'multiconsultorio']);
+    if (rows && rows.length > 0) {
+      return; // ya existe
+    }
+
+    const createSql = `
+      CREATE PROCEDURE sp_horario_crear(
+        IN p_dia_semana INT,
+        IN p_hora_inicio TIME,
+        IN p_hora_fin TIME,
+        IN p_descripcion VARCHAR(255),
+        OUT p_id_horario CHAR(36),
+        OUT p_success BOOLEAN,
+        OUT p_msg VARCHAR(255)
+      )
+      BEGIN
+        DECLARE v_exists CHAR(36);
+
+        IF p_hora_fin <= p_hora_inicio THEN
+          SET p_success = FALSE;
+          SET p_msg = 'Hora fin debe ser mayor que hora inicio';
+          SET p_id_horario = NULL;
+        ELSE
+          SELECT id_horario INTO v_exists FROM thorario
+            WHERE dia_semana = p_dia_semana
+              AND hora_inicio = p_hora_inicio
+              AND hora_fin = p_hora_fin
+            LIMIT 1;
+
+          IF v_exists IS NOT NULL THEN
+            SET p_id_horario = v_exists;
+            SET p_success = TRUE;
+            SET p_msg = 'Horario existente utilizado';
+          ELSE
+            SET p_id_horario = UUID();
+            INSERT INTO thorario (id_horario, dia_semana, hora_inicio, hora_fin, descripcion, estado)
+            VALUES (p_id_horario, p_dia_semana, p_hora_inicio, p_hora_fin, p_descripcion, 1);
+
+            SET p_success = TRUE;
+            SET p_msg = 'Horario creado exitosamente';
+          END IF;
+        END IF;
+      END`;
+
+    await pool.query(createSql);
+    console.log('SP `sp_horario_crear` creado dinámicamente.');
+  } catch (err) {
+    console.error('Error creando SP sp_horario_crear:', err);
+    throw err;
+  }
+}
+
 router.get('/horarios/gestionar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     // Obtener lista de personal activo
@@ -83,7 +139,9 @@ router.get('/horarios/personal/:id', requireAuth, requireRole(['admin']), async 
 
 // POST /horarios/asignar - Asignar horario a personal
 router.post('/horarios/asignar', requireAuth, requireRole(['admin']), async (req, res) => {
-  const { id_personal, id_horario, dia_descanso } = req.body;
+  const { id_personal, id_horario, dia_descanso, personalizado, dia, desde, hasta, descripcion } = req.body;
+
+  console.debug('POST /horarios/asignar payload:', { id_personal, id_horario, dia_descanso, personalizado, dia, desde, hasta, descripcion });
 
   // Validaciones
   const errors = [];
@@ -92,12 +150,19 @@ router.post('/horarios/asignar', requireAuth, requireRole(['admin']), async (req
     errors.push('El personal es obligatorio.');
   }
 
-  if (!id_horario || id_horario.trim() === '') {
-    errors.push('El horario es obligatorio.');
-  }
-
   if (!dia_descanso || dia_descanso.trim() === '') {
     errors.push('El día de descanso es obligatorio.');
+  }
+
+  // Si es personalizado, validar campos de horario personalizado
+  if (personalizado) {
+    if (!dia || !desde || !hasta) {
+      errors.push('Día, Desde y Hasta son obligatorios para horarios personalizados.');
+    }
+  } else {
+    if (!id_horario || id_horario.trim() === '') {
+      errors.push('El horario es obligatorio.');
+    }
   }
 
   if (errors.length > 0) {
@@ -124,9 +189,87 @@ router.post('/horarios/asignar', requireAuth, requireRole(['admin']), async (req
       }
     }
 
+    let idHorarioFinal = id_horario;
+
+    if (personalizado) {
+      // Mapear día a número
+      const diaMap = {
+        'Lunes': 1,
+        'Martes': 2,
+        'Miércoles': 3,
+        'Jueves': 4,
+        'Viernes': 5,
+        'Sábado': 6,
+        'Domingo': 7
+      };
+
+      const diaNumero = diaMap[dia];
+      if (!diaNumero) throw new Error('Día inválido en horario personalizado');
+
+      // Validar formato de horas (minutos 00)
+      const validarHoraMinutos = v => {
+        if (!v || typeof v !== 'string') return false;
+        const parts = v.split(':');
+        if (parts.length !== 2) return false;
+        const hh = parseInt(parts[0], 10);
+        const mm = parseInt(parts[1], 10);
+        if (isNaN(hh) || isNaN(mm)) return false;
+        return mm === 0;
+      };
+
+      if (!validarHoraMinutos(desde) || !validarHoraMinutos(hasta)) {
+        return res.status(400).json({ success: false, mensaje: 'Los minutos deben ser 00 y el formato HH:MM' });
+      }
+
+      // Llamar SP para crear o obtener horario - con manejo si el SP no existe
+      async function callCrearHorario() {
+        try {
+          await pool.query('CALL sp_horario_crear(?, ?, ?, ?, @p_id, @p_success, @p_msg)', [
+            diaNumero,
+            desde,
+            hasta,
+            descripcion || `Horario ${dia} ${desde}-${hasta}`
+          ]);
+
+          const [[out]] = await pool.query('SELECT @p_id AS id, @p_success AS success, @p_msg AS mensaje');
+
+          if (!out || !out.success) {
+            throw new Error(out ? out.mensaje : 'Error creando horario personalizado');
+          }
+
+          return out.id;
+        } catch (err) {
+          // Si el SP no existe, intentar crear y reintentar una vez
+          const msg = (err && (err.sqlMessage || err.message || '')).toString();
+          if (msg.includes('does not exist') || msg.toLowerCase().includes('sp_horario_crear')) {
+            console.warn('sp_horario_crear no existe. Intentando crear...');
+            await ensureSpHorarioCrear();
+            // reintentar
+            await pool.query('CALL sp_horario_crear(?, ?, ?, ?, @p_id, @p_success, @p_msg)', [
+              diaNumero,
+              desde,
+              hasta,
+              descripcion || `Horario ${dia} ${desde}-${hasta}`
+            ]);
+
+            const [[out2]] = await pool.query('SELECT @p_id AS id, @p_success AS success, @p_msg AS mensaje');
+            if (!out2 || !out2.success) {
+              throw new Error(out2 ? out2.mensaje : 'Error creando horario personalizado (2do intento)');
+            }
+            return out2.id;
+          }
+
+          throw err;
+        }
+      }
+
+      idHorarioFinal = await callCrearHorario();
+    }
+
+    // Asignar horario al personal vía SP
     await pool.query('CALL sp_asignar_horario_personal(?, ?, ?)', [
       id_personal,
-      id_horario,
+      idHorarioFinal,
       dia_descanso
     ]);
 

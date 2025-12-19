@@ -123,6 +123,67 @@ END//
 DELIMITER ;
 
 DELIMITER //
+CREATE PROCEDURE `sp_horario_crear`(
+  IN p_dia_semana INT,
+  IN p_hora_inicio TIME,
+  IN p_hora_fin TIME,
+  IN p_descripcion VARCHAR(255),
+  OUT p_id_horario CHAR(36),
+  OUT p_success BOOLEAN,
+  OUT p_msg VARCHAR(255)
+)
+BEGIN
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    SET p_success = FALSE;
+    SET p_msg = 'Error interno al crear horario';
+    RESIGNAL;
+  END;
+
+  -- Validaciones básicas
+  IF p_hora_fin <= p_hora_inicio THEN
+    SET p_success = FALSE;
+    SET p_msg = 'Hora fin debe ser mayor que hora inicio';
+    SET p_id_horario = NULL;
+    LEAVE proc_end;
+  END IF;
+
+  START TRANSACTION;
+
+  -- Buscar si ya existe un horario idéntico
+  SELECT id_horario INTO p_id_horario
+  FROM thorario
+  WHERE dia_semana = p_dia_semana
+    AND hora_inicio = p_hora_inicio
+    AND hora_fin = p_hora_fin
+  LIMIT 1;
+
+  IF p_id_horario IS NOT NULL THEN
+    SET p_success = TRUE;
+    SET p_msg = 'Horario existente utilizado';
+    COMMIT;
+    LEAVE proc_end;
+  END IF;
+
+  -- Insertar nuevo horario (usar UUID para obtener id)
+  DECLARE v_new_id CHAR(36);
+  SET v_new_id = UUID();
+
+  INSERT INTO thorario (id_horario, dia_semana, hora_inicio, hora_fin, descripcion, estado)
+  VALUES (v_new_id, p_dia_semana, p_hora_inicio, p_hora_fin, p_descripcion, 1);
+
+  SET p_id_horario = v_new_id;
+  SET p_success = TRUE;
+  SET p_msg = 'Horario creado exitosamente';
+
+  COMMIT;
+
+  proc_end: BEGIN END;
+END//
+DELIMITER ;
+
+DELIMITER //
 CREATE PROCEDURE `sp_auth_get_personal`(IN p_identity VARCHAR(100))
 BEGIN
     SELECT p.id_personal,
