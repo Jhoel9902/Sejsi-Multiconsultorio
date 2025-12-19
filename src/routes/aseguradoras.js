@@ -4,7 +4,6 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /aseguradoras - Listar aseguradoras (admin)
 router.get('/aseguradoras', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const [result] = await pool.query('CALL sp_listar_aseguradoras()');
@@ -15,12 +14,10 @@ router.get('/aseguradoras', requireAuth, requireRole(['admin']), async (req, res
   }
 });
 
-// GET /aseguradoras/registrar - Mostrar formulario (admin)
 router.get('/aseguradoras/registrar', requireAuth, requireRole(['admin']), (req, res) => {
   res.render('aseguradoras/registrar', { user: req.user, error: null, formData: {} });
 });
 
-// POST /aseguradoras - Registrar aseguradora (admin)
 router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, res) => {
   const {
     nombre,
@@ -32,10 +29,8 @@ router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, re
     fecha_fin
   } = req.body;
 
-  // Validaciones Frontend
   const errors = [];
 
-  // Validar nombre: obligatorio, letras, espacios y caracteres especiales españoles
   if (!nombre || nombre.trim() === '') {
     errors.push('El nombre de la aseguradora es obligatorio.');
   } else if (!/^[a-zA-ZáéíóúñÁÉÍÓÚÑ\s\-\.]+$/.test(nombre)) {
@@ -44,7 +39,6 @@ router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, re
     errors.push('El nombre no puede exceder 100 caracteres.');
   }
 
-  // Validar correo: obligatorio, formato válido
   if (!correo || correo.trim() === '') {
     errors.push('El correo es obligatorio.');
   } else {
@@ -54,19 +48,16 @@ router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, re
     }
   }
 
-  // Validar teléfono: obligatorio, 10-11 dígitos
   if (!telefono || telefono.trim() === '') {
     errors.push('El teléfono es obligatorio.');
   } else if (!/^[0-9]{10,11}$/.test(telefono.replace(/\D/g, ''))) {
     errors.push('El teléfono debe tener 10-11 dígitos.');
   }
 
-  // Validar descripción: opcional
   if (descripcion && descripcion.length > 500) {
     errors.push('La descripción no puede exceder 500 caracteres.');
   }
 
-  // Validar porcentaje cobertura: obligatorio, entre 0-100
   if (!porcentaje_cobertura || porcentaje_cobertura.trim() === '') {
     errors.push('El porcentaje de cobertura es obligatorio.');
   } else {
@@ -76,7 +67,6 @@ router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, re
     }
   }
 
-  // Validar fechas
   if (!fecha_inicio || fecha_inicio.trim() === '') {
     errors.push('La fecha de inicio es obligatoria.');
   }
@@ -93,7 +83,6 @@ router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, re
     }
   }
 
-  // Si hay errores, devolver formulario con errores
   if (errors.length > 0) {
     return res.status(400).render('aseguradoras/registrar', {
       user: req.user,
@@ -128,27 +117,22 @@ router.post('/aseguradoras', requireAuth, requireRole(['admin']), async (req, re
   }
 });
 
-// GET /aseguradoras/asignar - Gestionar asignaciones de aseguradoras a pacientes (admin)
 router.get('/aseguradoras/asignar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const itemsPerPage = 10;
     const offset = (page - 1) * itemsPerPage;
 
-    // Obtener lista de pacientes con sus aseguradoras
     const [result] = await pool.query('CALL sp_listar_pacientes_con_aseguradora()');
     const allPacientes = Array.isArray(result) ? result[0] : result || [];
 
-    // Calcular paginación
     const totalPacientes = allPacientes.length;
     const totalPages = Math.ceil(totalPacientes / itemsPerPage);
     const pacientes = allPacientes.slice(offset, offset + itemsPerPage);
 
-    // Obtener lista de aseguradoras activas para el dropdown
     const [asegResult] = await pool.query('CALL sp_listar_aseguradoras()');
     const aseguradoras = Array.isArray(asegResult) ? asegResult[0] : asegResult;
 
-    // Validar página
     if (page > totalPages && totalPages > 0) {
       return res.redirect(`/aseguradoras/asignar?page=${totalPages}`);
     }
@@ -180,11 +164,9 @@ router.get('/aseguradoras/asignar', requireAuth, requireRole(['admin']), async (
   }
 });
 
-// POST /aseguradoras/asignar - Asignar aseguradora a paciente (admin)
 router.post('/aseguradoras/asignar', requireAuth, requireRole(['admin']), async (req, res) => {
   const { id_paciente, id_aseguradora, numero_poliza } = req.body;
 
-  // Validaciones
   const errors = [];
 
   if (!id_paciente || id_paciente.trim() === '') {
@@ -232,11 +214,9 @@ router.post('/aseguradoras/asignar', requireAuth, requireRole(['admin']), async 
   }
 });
 
-// POST /aseguradoras/desasignar - Quitar aseguradora de paciente (admin)
 router.post('/aseguradoras/desasignar', requireAuth, requireRole(['admin']), async (req, res) => {
   const { id_paciente, id_aseguradora } = req.body;
 
-  // Validaciones
   const errors = [];
 
   if (!id_paciente || id_paciente.trim() === '') {
