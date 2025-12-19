@@ -6,8 +6,8 @@ const router = Router();
 
 router.get('/aseguradoras', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const [result] = await pool.query('CALL sp_listar_aseguradoras()');
-    const aseguradoras = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_listar_aseguradoras()');
+    const aseguradoras = resultCallData[0][0];
     res.render('aseguradoras/lista', { user: req.user, aseguradoras });
   } catch (err) {
     res.status(500).send('Error al cargar aseguradoras.');
@@ -123,15 +123,15 @@ router.get('/aseguradoras/asignar', requireAuth, requireRole(['admin']), async (
     const itemsPerPage = 10;
     const offset = (page - 1) * itemsPerPage;
 
-    const [result] = await pool.query('CALL sp_listar_pacientes_con_aseguradora()');
-    const allPacientes = Array.isArray(result) ? result[0] : result || [];
+    const resultPacCallData = await pool.query('CALL sp_listar_pacientes_con_aseguradora()');
+    const allPacientes = resultPacCallData[0][0] || [];
 
     const totalPacientes = allPacientes.length;
     const totalPages = Math.ceil(totalPacientes / itemsPerPage);
     const pacientes = allPacientes.slice(offset, offset + itemsPerPage);
 
-    const [asegResult] = await pool.query('CALL sp_listar_aseguradoras()');
-    const aseguradoras = Array.isArray(asegResult) ? asegResult[0] : asegResult;
+    const asegCallData = await pool.query('CALL sp_listar_aseguradoras()');
+    const aseguradoras = asegCallData[0][0];
 
     if (page > totalPages && totalPages > 0) {
       return res.redirect(`/aseguradoras/asignar?page=${totalPages}`);
@@ -254,6 +254,54 @@ router.post('/aseguradoras/desasignar', requireAuth, requireRole(['admin']), asy
       success: false, 
       mensaje: errorMessage 
     });
+  }
+});
+
+// GET /aseguradoras/buscar-pacientes - Búsqueda dinámica de pacientes
+router.get('/aseguradoras/buscar-pacientes', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q || q.trim().length === 0) {
+      return res.json({ success: true, pacientes: [] });
+    }
+
+    const searchTerm = `%${q.trim()}%`;
+
+    // Buscar por nombre, CI o apellido
+    const [pacientes] = await pool.query(
+      `SELECT 
+        id_paciente,
+        nombre,
+        apellido_paterno,
+        apellido_materno,
+        ci,
+        celular
+      FROM tpaciente
+      WHERE estado = 1
+      AND (
+        CONCAT(nombre, ' ', COALESCE(apellido_paterno, ''), ' ', COALESCE(apellido_materno, '')) LIKE ?
+        OR ci LIKE ?
+        OR nombre LIKE ?
+        OR apellido_paterno LIKE ?
+        OR apellido_materno LIKE ?
+      )
+      ORDER BY nombre ASC
+      LIMIT 20`,
+      [searchTerm, searchTerm, searchTerm, searchTerm, searchTerm]
+    );
+
+    const formattedPacientes = pacientes.map(p => ({
+      id_paciente: p.id_paciente,
+      nombre: `${p.nombre} ${p.apellido_paterno || ''} ${p.apellido_materno || ''}`.trim(),
+      ci: p.ci,
+      celular: p.celular || '-'
+    }));
+
+    res.json({ success: true, pacientes: formattedPacientes });
+  } catch (error) {
+    console.error('Error al buscar pacientes:', error);
+    res.status(500).json({ success: false, mensaje: 'Error al buscar pacientes' });
   }
 });
 

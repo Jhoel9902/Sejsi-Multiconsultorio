@@ -5,14 +5,84 @@
         </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="row mb-3">
-        <div class="col-md-4">
-            <label class="form-label fw-bold">Buscar por ID Cita</label>
-            <input type="text" class="form-control" id="id_cita_busqueda" placeholder="Ingresa ID de cita">
-        </div>
-        <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary w-100" onclick="buscarFacturas()"><i class="bi bi-search me-2"></i>Buscar</button>
+    <!-- Filtros - Opciones de Búsqueda -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i class="bi bi-search me-2"></i>Búsqueda de Pagos Pendientes</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="busquedaTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-paciente" data-bs-toggle="tab" data-bs-target="#buscar-paciente" type="button">
+                                <i class="bi bi-person me-2"></i>Por Paciente
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-rango" data-bs-toggle="tab" data-bs-target="#buscar-rango" type="button">
+                                <i class="bi bi-calendar-range me-2"></i>Por Rango Fechas
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-aseguradoras" data-bs-toggle="tab" data-bs-target="#buscar-aseguradoras" type="button">
+                                <i class="bi bi-shield-check me-2"></i>Facturas de Aseguradoras
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content mt-3">
+                        <!-- Búsqueda por Paciente -->
+                        <div class="tab-pane fade show active" id="buscar-paciente">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <label class="form-label fw-bold">Nombre o CI del Paciente</label>
+                                    <input type="text" class="form-control" id="paciente_busqueda" placeholder="Ej: Juan Pérez o 1234567">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button class="btn btn-primary w-100" onclick="buscarPorPaciente()">
+                                        <i class="bi bi-search me-2"></i>Buscar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Búsqueda por Rango de Fechas -->
+                        <div class="tab-pane fade" id="buscar-rango">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <label class="form-label fw-bold">Desde</label>
+                                    <input type="date" class="form-control" id="fecha_desde">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label fw-bold">Hasta</label>
+                                    <input type="date" class="form-control" id="fecha_hasta">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button class="btn btn-primary w-100" onclick="buscarPorFechas()">
+                                        <i class="bi bi-search me-2"></i>Buscar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Búsqueda por Aseguradoras -->
+                        <div class="tab-pane fade" id="buscar-aseguradoras">
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <label class="form-label fw-bold">Seleccionar Aseguradora</label>
+                                    <select class="form-select" id="aseguradora_filtro" onchange="cargarFacturasAseguradora()">
+                                        <option value="">-- Cargando aseguradoras --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-5">
+                                    <div id="resumen-aseguradora" class="mt-4"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -49,6 +119,67 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Facturas de Aseguradoras -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Facturas de Aseguradoras (Pendientes de Pago)</h6>
+                </div>
+                <div class="card-body">
+                    <div id="resumen-aseguradora" class="mb-3"></div>
+                    <div class="table-responsive">
+                        <table class="table table-hover table-sm" id="tabla-aseguradoras">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 18%;">Número Factura</th>
+                                    <th style="width: 22%;">Paciente</th>
+                                    <th style="width: 18%;">Servicio</th>
+                                    <th style="width: 12%;">Subtotal</th>
+                                    <th style="width: 12%;">A Cobrar</th>
+                                    <th style="width: 12%;">Fecha</th>
+                                    <th style="width: 6%;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="facturas-aseguradoras-tbody">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="bi bi-search me-2"></i>Abre la pestaña "Facturas de Aseguradoras"
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Seleccionar Aseguradora (NUEVO) -->
+<div class="modal fade" id="modalSeleccionarAseguradora" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title"><i class="bi bi-shield-check me-2"></i>Seleccionar Aseguradora</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">El paciente tiene aseguradora. Selecciona una para incluirla en el pago:</p>
+                <div id="aseguradoras-list"></div>
+                <div class="alert alert-info mt-3" role="alert">
+                    <small><i class="bi bi-info-circle me-2"></i>Se generarán dos facturas: una pagada (cliente) y otra pendiente (aseguradora)</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSinAseguradora" onclick="pagarSinAseguradora()">
+                    <i class="bi bi-x-circle me-2"></i>Pagar sin Aseguradora
+                </button>
             </div>
         </div>
     </div>
@@ -107,82 +238,141 @@
 
 <script>
     let id_factura_actual = null;
+    let id_cita_actual = null;
+    let id_paciente_actual = null;
+    let precio_servicio_actual = null;
+    let id_servicio_actual = null;
+    let id_aseguradora_seleccionada = null;
 
-    async function buscarFacturas() {
-        const id_cita = document.getElementById('id_cita_busqueda').value.trim();
+    // ============== FUNCIONES DE BÚSQUEDA ==============
+    
+    async function buscarPorPaciente() {
+        const termino = document.getElementById('paciente_busqueda').value.trim();
 
-        if (!id_cita) {
-            mostrarAlerta('Por favor ingresa un ID de cita', 'warning');
+        if (!termino) {
+            mostrarAlerta('Por favor ingresa el nombre o CI del paciente', 'warning');
             return;
         }
 
         try {
-            const response = await fetch(`/pagos/cita/${id_cita}`);
+            const response = await fetch(`/pagos/buscar-por-paciente?termino=${encodeURIComponent(termino)}`);
             const data = await response.json();
 
             if (!data.success) {
                 mostrarAlerta(data.mensaje, 'warning');
-                document.getElementById('facturas-tbody').innerHTML = `
-                    <tr>
-                        <td colspan="6" class="text-center text-muted">
-                            <i class="bi bi-exclamation-circle me-2"></i>No se encontraron facturas
-                        </td>
-                    </tr>
-                `;
+                limpiarTabla();
                 return;
             }
 
-            const facturas = data.facturas || [];
-            const tbody = document.getElementById('facturas-tbody');
-            tbody.innerHTML = '';
-
-            if (facturas.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="6" class="text-center text-muted">
-                            <i class="bi bi-inbox me-2"></i>Sin facturas
-                        </td>
-                    </tr>
-                `;
-                mostrarAlerta('No se encontraron facturas para esta cita', 'info');
-                return;
-            }
-
-            facturas.forEach(factura => {
-                const tipoBadge = factura.tipo_factura === 'cliente' 
-                    ? '<span class="badge bg-info"><i class="bi bi-person me-1"></i>Cliente</span>' 
-                    : '<span class="badge bg-warning text-dark"><i class="bi bi-hospital me-1"></i>Aseguradora</span>';
-
-                const estadoBadge = factura.metodo_pago 
-                    ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Pagado</span>'
-                    : '<span class="badge bg-secondary">Pendiente</span>';
-
-                const row = `
-                    <tr>
-                        <td><strong>${factura.numero_factura}</strong></td>
-                        <td>${tipoBadge}</td>
-                        <td>$${parseFloat(factura.subtotal).toFixed(2)}</td>
-                        <td><strong>$${parseFloat(factura.total).toFixed(2)}</strong></td>
-                        <td><small>${new Date(factura.fecha_emision).toLocaleDateString('es-ES')}</small></td>
-                        <td>
-                            ${factura.tipo_factura === 'cliente' 
-                                ? `<button class="btn btn-sm btn-info me-2" onclick="verFacturaCliente('${factura.id_factura_cliente}')"><i class="bi bi-eye me-1"></i>Ver</button>` 
-                                : '<button class="btn btn-sm btn-secondary me-2" disabled><i class="bi bi-eye me-1"></i>Ver</button>'}
-                            ${estadoBadge}
-                        </td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-
-            mostrarAlerta(`✓ Se encontraron ${facturas.length} factura(s)`, 'success');
+            mostrarFacturas(data.facturas || []);
         } catch (error) {
-            console.error('Error al buscar facturas:', error);
+            console.error('Error:', error);
             mostrarAlerta('Error al buscar facturas', 'danger');
         }
     }
 
-    async function verFacturaCliente(id_factura) {
+    async function buscarPorFechas() {
+        const fecha_desde = document.getElementById('fecha_desde').value;
+        const fecha_hasta = document.getElementById('fecha_hasta').value;
+
+        if (!fecha_desde || !fecha_hasta) {
+            mostrarAlerta('Por favor especifica ambas fechas', 'warning');
+            return;
+        }
+
+        if (fecha_desde > fecha_hasta) {
+            mostrarAlerta('La fecha inicial debe ser anterior a la fecha final', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/pagos/buscar-por-fechas?fecha_desde=${fecha_desde}&fecha_hasta=${fecha_hasta}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'warning');
+                limpiarTabla();
+                return;
+            }
+
+            mostrarFacturas(data.facturas || []);
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al buscar facturas', 'danger');
+        }
+    }
+
+    function mostrarFacturas(facturas) {
+        const tbody = document.getElementById('facturas-tbody');
+        tbody.innerHTML = '';
+
+        if (facturas.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <i class="bi bi-inbox me-2"></i>No se encontraron facturas
+                    </td>
+                </tr>
+            `;
+            mostrarAlerta('No se encontraron facturas', 'info');
+            return;
+        }
+
+        facturas.forEach(factura => {
+            const tipoBadge = factura.tipo_factura === 'cliente' 
+                ? '<span class="badge bg-info"><i class="bi bi-person me-1"></i>Cliente</span>' 
+                : '<span class="badge bg-warning text-dark"><i class="bi bi-hospital me-1"></i>Aseguradora</span>';
+
+            const estadoBadge = factura.metodo_pago 
+                ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Pagado</span>'
+                : '<span class="badge bg-danger"><i class="bi bi-clock me-1"></i>Pendiente</span>';
+
+            const id_factura = factura.tipo_factura === 'cliente' 
+                ? factura.id_factura_cliente 
+                : factura.id_factura_aseguradora;
+
+            const btnAccion = factura.tipo_factura === 'cliente' && !factura.metodo_pago
+                ? `<button class="btn btn-sm btn-success me-2" onclick="verFacturaCliente('${id_factura}', '${factura.tipo_factura}')"><i class="bi bi-cash me-1"></i>Pagar</button>` 
+                : `<button class="btn btn-sm btn-info me-2" onclick="verFacturaDetalle('${id_factura}', '${factura.tipo_factura}')"><i class="bi bi-eye me-1"></i>Ver</button>`;
+
+            const row = `
+                <tr>
+                    <td><strong>${factura.numero_factura}</strong></td>
+                    <td>${tipoBadge}</td>
+                    <td>$${parseFloat(factura.subtotal).toFixed(2)}</td>
+                    <td><strong>$${parseFloat(factura.total).toFixed(2)}</strong></td>
+                    <td><small>${new Date(factura.fecha_emision).toLocaleDateString('es-ES')}</small></td>
+                    <td>
+                        ${btnAccion}
+                        ${estadoBadge}
+                    </td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        });
+
+        mostrarAlerta(`✓ Se encontraron ${facturas.length} factura(s)`, 'success');
+    }
+
+    function limpiarTabla() {
+        const tbody = document.getElementById('facturas-tbody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="bi bi-search me-2"></i>Realiza una búsqueda para ver las facturas
+                </td>
+            </tr>
+        `;
+    }
+
+    // ============== FUNCIONES DE FACTURA Y PAGO ==============
+
+    async function verFacturaCliente(id_factura, tipo = 'cliente') {
+        if (tipo !== 'cliente') {
+            verFacturaDetalle(id_factura, tipo);
+            return;
+        }
+
         id_factura_actual = id_factura;
 
         try {
@@ -196,6 +386,10 @@
 
             const factura = data.factura;
             const detalles = data.detalles || [];
+
+            // Guardar datos para el pago
+            id_cita_actual = factura.id_cita;
+            id_paciente_actual = factura.id_paciente;
 
             let detallesHtml = '';
             detalles.forEach(detalle => {
@@ -213,7 +407,7 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <p><strong>Número Factura:</strong> <code>${factura.numero_factura}</code></p>
-                        <p><strong>Paciente ID:</strong> <code>${factura.id_paciente}</code></p>
+                        <p><strong>Paciente:</strong> ${factura.nombre_paciente || 'No disponible'}</p>
                     </div>
                     <div class="col-md-6 text-end">
                         <p><strong>Fecha Emisión:</strong> ${new Date(factura.fecha_emision).toLocaleDateString('es-ES')}</p>
@@ -273,6 +467,15 @@
             `;
 
             document.getElementById('factura-cliente-content').innerHTML = contenido;
+            
+            // Mostrar/ocultar botón de pago según estado
+            const btnPago = document.querySelector('#modalFacturaCliente .btn-success');
+            if (factura.metodo_pago) {
+                btnPago.style.display = 'none';
+            } else {
+                btnPago.style.display = 'block';
+            }
+            
             new bootstrap.Modal(document.getElementById('modalFacturaCliente')).show();
         } catch (error) {
             console.error('Error al obtener factura:', error);
@@ -280,8 +483,66 @@
         }
     }
 
-    function abrirModalPago() {
+    async function verFacturaDetalle(id_factura, tipo) {
+        // Para facturas de aseguradora, solo mostrar información
+        mostrarAlerta('Las facturas de aseguradora se pagan de forma separada cuando la aseguradora lo indique.', 'info');
+    }
+
+    async function abrirModalPago() {
         bootstrap.Modal.getInstance(document.getElementById('modalFacturaCliente')).hide();
+        
+        // Verificar si el paciente tiene aseguradoras
+        try {
+            const response = await fetch(`/pagos/aseguradoras-paciente/${id_paciente_actual}`);
+            const data = await response.json();
+
+            if (data.success && data.aseguradoras && data.aseguradoras.length > 0) {
+                // Mostrar modal de selección de aseguradora
+                mostrarModalSeleccionarAseguradora(data.aseguradoras);
+            } else {
+                // No tiene aseguradoras, ir directamente a registrar pago
+                pagarSinAseguradora();
+            }
+        } catch (error) {
+            console.error('Error al obtener aseguradoras:', error);
+            pagarSinAseguradora();
+        }
+    }
+
+    function mostrarModalSeleccionarAseguradora(aseguradoras) {
+        let aseguradoresHtml = '<div class="list-group">';
+        
+        aseguradoras.forEach(aseg => {
+            aseguradoresHtml += `
+                <button type="button" class="list-group-item list-group-item-action text-start" onclick="seleccionarAseguradora('${aseg.id_aseguradora}', '${aseg.nombre}', ${aseg.porcentaje_cobertura})">
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">${aseg.nombre}</h6>
+                            <small class="text-muted">Póliza: ${aseg.numero_poliza || 'N/A'}</small>
+                        </div>
+                        <span class="badge bg-primary rounded-pill">${aseg.porcentaje_cobertura}%</span>
+                    </div>
+                </button>
+            `;
+        });
+        
+        aseguradoresHtml += '</div>';
+        document.getElementById('aseguradoras-list').innerHTML = aseguradoresHtml;
+        
+        new bootstrap.Modal(document.getElementById('modalSeleccionarAseguradora')).show();
+    }
+
+    function seleccionarAseguradora(id_aseg, nombre, cobertura) {
+        id_aseguradora_seleccionada = id_aseg;
+        bootstrap.Modal.getInstance(document.getElementById('modalSeleccionarAseguradora')).hide();
+        
+        // Mostrar modal de pago
+        new bootstrap.Modal(document.getElementById('modalRegistroPago')).show();
+    }
+
+    function pagarSinAseguradora() {
+        id_aseguradora_seleccionada = null;
+        bootstrap.Modal.getInstance(document.getElementById('modalSeleccionarAseguradora'))?.hide();
         new bootstrap.Modal(document.getElementById('modalRegistroPago')).show();
     }
 
@@ -294,14 +555,17 @@
         }
 
         try {
-            const response = await fetch('/pagos/registrar-pago', {
+            const response = await fetch('/pagos/registrar-pago-con-aseguradora', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     id_factura_cliente: id_factura_actual,
-                    metodo_pago
+                    id_cita: id_cita_actual,
+                    id_paciente: id_paciente_actual,
+                    metodo_pago,
+                    id_aseguradora: id_aseguradora_seleccionada
                 })
             });
 
@@ -313,14 +577,30 @@
             }
 
             bootstrap.Modal.getInstance(document.getElementById('modalRegistroPago')).hide();
-            mostrarAlerta('✅ Pago registrado exitosamente', 'success');
             
-            // Refrescar búsqueda
+            // Mostrar resumen de facturas generadas
+            let resumen = `✅ Pago registrado exitosamente\n\n`;
+            resumen += `Factura Cliente (PAGADA): ${data.id_factura_cliente}\n`;
+            if (data.id_factura_aseguradora) {
+                resumen += `Factura Aseguradora (PENDIENTE): ${data.id_factura_aseguradora}`;
+            }
+            
+            mostrarAlerta(resumen, 'success');
+            
+            // Refrescar la búsqueda actual
             setTimeout(() => {
-                buscarFacturas();
+                document.getElementById('metodo_pago').value = '';
+                id_aseguradora_seleccionada = null;
+                
+                const activeTab = document.querySelector('.nav-link.active');
+                if (activeTab.id === 'tab-paciente') {
+                    buscarPorPaciente();
+                } else if (activeTab.id === 'tab-rango') {
+                    buscarPorFechas();
+                }
             }, 1500);
         } catch (error) {
-            console.error('Error al registrar pago:', error);
+            console.error('Error:', error);
             mostrarAlerta('Error al registrar pago', 'danger');
         }
     }
@@ -330,9 +610,119 @@
         alertasDiv.innerHTML = `
             <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
                 <i class="bi bi-${tipo === 'success' ? 'check-circle' : tipo === 'danger' ? 'exclamation-triangle' : tipo === 'warning' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
-                ${mensaje}
+                ${mensaje.replace(/\n/g, '<br>')}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `;
     }
+    
+    // Funciones para Facturas de Aseguradoras
+    async function cargarAseguradoras() {
+        try {
+            const response = await fetch('/pagos/aseguradoras');
+            const data = await response.json();
+            
+            if (data.success && data.aseguradoras.length > 0) {
+                const select = document.getElementById('aseguradora_filtro');
+                select.innerHTML = '<option value="">-- Seleccionar Aseguradora --</option>';
+                
+                data.aseguradoras.forEach(aseg => {
+                    const option = document.createElement('option');
+                    option.value = aseg.id_aseguradora;
+                    option.textContent = `${aseg.nombre} (${aseg.total_facturas} facturas - $${parseFloat(aseg.monto_total || 0).toFixed(2)})`;
+                    select.appendChild(option);
+                });
+            } else {
+                document.getElementById('aseguradora_filtro').innerHTML = '<option value="">Sin facturas pendientes</option>';
+            }
+        } catch (error) {
+            console.error('Error al cargar aseguradoras:', error);
+        }
+    }
+    
+    async function cargarFacturasAseguradora() {
+        const id_aseguradora = document.getElementById('aseguradora_filtro').value;
+        
+        if (!id_aseguradora) {
+            document.getElementById('facturas-aseguradoras-tbody').innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        <i class="bi bi-search me-2"></i>Selecciona una aseguradora
+                    </td>
+                </tr>
+            `;
+            document.getElementById('resumen-aseguradora').innerHTML = '';
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/pagos/facturas-aseguradora/${id_aseguradora}`);
+            const data = await response.json();
+            
+            if (data.success && data.facturas.length > 0) {
+                const tbody = document.getElementById('facturas-aseguradoras-tbody');
+                tbody.innerHTML = '';
+                
+                let totalPendiente = 0;
+                let totalPagado = 0;
+                
+                data.facturas.forEach((factura, index) => {
+                    const nombrePaciente = `${factura.nombre_paciente} ${factura.apellido_paterno || ''} ${factura.apellido_materno || ''}`.trim();
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${factura.numero_factura}</strong></td>
+                        <td>${nombrePaciente}</td>
+                        <td>${factura.nombre_servicio}</td>
+                        <td>$${parseFloat(factura.subtotal).toFixed(2)}</td>
+                        <td><strong>$${parseFloat(factura.total_cubierto).toFixed(2)}</strong></td>
+                        <td>${new Date(factura.fecha_emision).toLocaleDateString('es-ES')}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="verDetalleFactura('${factura.id_factura_aseguradora}', true)">
+                                <i class="bi bi-eye"></i> Ver
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                    
+                    totalPendiente += parseFloat(factura.total_cubierto);
+                });
+                
+                // Mostrar resumen
+                document.getElementById('resumen-aseguradora').innerHTML = `
+                    <div class="alert alert-info mb-0">
+                        <strong>📊 Resumen:</strong><br>
+                        <small>
+                            Total Facturas: <strong>${data.facturas.length}</strong><br>
+                            Monto Pendiente: <strong class="text-success">$${totalPendiente.toFixed(2)}</strong>
+                        </small>
+                    </div>
+                `;
+            } else {
+                document.getElementById('facturas-aseguradoras-tbody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="bi bi-check-circle me-2"></i>No hay facturas para esta aseguradora
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('resumen-aseguradora').innerHTML = `
+                    <div class="alert alert-success mb-0">
+                        ✓ Sin facturas pendientes
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error al cargar facturas:', error);
+            mostrarAlerta('Error al cargar facturas', 'danger');
+        }
+    }
+    
+    // Cargar aseguradoras cuando se abre la pestaña
+    document.addEventListener('DOMContentLoaded', function() {
+        const asegTab = document.getElementById('tab-aseguradoras');
+        if (asegTab) {
+            asegTab.addEventListener('click', cargarAseguradoras);
+        }
+    });
 </script>

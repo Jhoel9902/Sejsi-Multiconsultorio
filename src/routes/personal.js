@@ -8,8 +8,8 @@ const router = Router();
 
 router.get('/personal/registrar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const [especialidades] = await pool.query('CALL sp_esp_listar()');
-    const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
+    const espsCallData = await pool.query('CALL sp_esp_listar()');
+    const esps = espsCallData[0][0];
 
     const [roles] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
 
@@ -52,8 +52,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
     especialidades = [],
   } = req.body;
 
-  const [espsData] = await pool.query('CALL sp_esp_listar()');
-  const especialidadesDisponibles = Array.isArray(espsData) ? espsData[0] : espsData;
+  const espsCallData = await pool.query('CALL sp_esp_listar()');
+  const especialidadesDisponibles = espsCallData[0][0];
   
   const [rolesData] = await pool.query('SELECT id_rol, nombre_rol FROM trol WHERE estado = TRUE ORDER BY nombre_rol');
 
@@ -241,8 +241,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
 
 router.get('/personal/gestionar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const [result] = await pool.query('CALL sp_personal_listar()');
-    const personal = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_personal_listar()');
+    const personal = resultCallData[0][0];
 
     res.render('personal/gestionar', { user: req.user, personal });
   } catch (err) {
@@ -255,8 +255,8 @@ router.get('/personal/obtener-formulario/:id', requireAuth, requireRole(['admin'
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query('CALL sp_personal_obtener_por_id(?)', [id]);
-    const rows = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_personal_obtener_por_id(?)', [id]);
+    const rows = resultCallData[0][0];
 
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: 'Personal no encontrado' });
@@ -411,8 +411,8 @@ router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']
     const q = req.query.q || '';
     let medicos = [];
 
-    const [result] = await pool.query('CALL sp_personal_listar_medicos()');
-    medicos = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_personal_listar_medicos()');
+    medicos = resultCallData[0][0];
 
     if (q.trim().length > 0) {
       const queryLower = q.toLowerCase().trim();
@@ -422,8 +422,8 @@ router.get('/personal/medicos', requireAuth, requireRole(['admin', 'ventanilla']
       });
     }
 
-    const [especialidades] = await pool.query('CALL sp_esp_listar()');
-    const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
+    const espsCallData = await pool.query('CALL sp_esp_listar()');
+    const esps = espsCallData[0][0];
 
     if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
       return res.json({ medicos });
@@ -443,8 +443,8 @@ router.get('/personal/medico/:id', requireAuth, requireRole(['admin', 'ventanill
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query('CALL sp_personal_obtener_medico(?)', [id]);
-    const rows = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_personal_obtener_medico(?)', [id]);
+    const rows = resultCallData[0][0];
 
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: 'Médico no encontrado' });
@@ -462,8 +462,8 @@ router.get('/personal/mi-perfil', requireAuth, async (req, res) => {
   const userId = req.user.id_personal;
 
   try {
-    const [rows] = await pool.query('CALL sp_personal_obtener_sesion(?)', [userId]);
-    const result = Array.isArray(rows) ? rows[0] : rows;
+    const rowsCallData = await pool.query('CALL sp_personal_obtener_sesion(?)', [userId]);
+    const result = rowsCallData[0][0];
 
     if (!result || result.length === 0) {
       return res.status(404).json({ error: 'Datos del usuario no encontrados' });
@@ -479,8 +479,8 @@ router.get('/personal/mi-perfil', requireAuth, async (req, res) => {
 
 router.get('/personal/contratos', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const [result] = await pool.query('CALL sp_personal_listar()');
-    const personal = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_personal_listar()');
+    const personal = resultCallData[0][0];
 
     console.log('SP Result:', JSON.stringify(personal, null, 2));
 

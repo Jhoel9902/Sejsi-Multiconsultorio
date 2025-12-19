@@ -24,13 +24,25 @@
                 <h6 class="card-title mb-3"><i class="bi bi-plus-circle me-2"></i>Asignar Nueva Aseguradora</h6>
 
                 <div class="mb-3">
-                  <label for="selectPaciente" class="form-label">Paciente <span class="text-danger">*</span></label>
-                  <select id="selectPaciente" class="form-select" required>
-                    <option value="">-- Seleccionar paciente --</option>
-                    <% pacientes.forEach(pac => { %>
-                      <option value="<%= pac.id_paciente %>"><%= pac.nombres %> (C.I.: <%= pac.ci %>)</option>
-                    <% }); %>
-                  </select>
+                  <label for="inputBuscarPaciente" class="form-label">Paciente <span class="text-danger">*</span></label>
+                  <div class="position-relative">
+                    <input 
+                      type="text" 
+                      id="inputBuscarPaciente" 
+                      class="form-control" 
+                      placeholder="Buscar por nombre, CI o apellido..."
+                      autocomplete="off">
+                    <div 
+                      id="listaPacientesDropdown" 
+                      class="position-absolute w-100 bg-white border border-top-0 rounded-bottom shadow-sm"
+                      style="display: none; max-height: 250px; overflow-y: auto; z-index: 1000; top: 100%;">
+                    </div>
+                  </div>
+                  <input 
+                    type="hidden" 
+                    id="selectPaciente" 
+                    value="">
+                  <small class="d-block text-muted mt-1" id="pacienteSeleccionado"></small>
                 </div>
 
                 <div class="mb-3">
@@ -188,7 +200,7 @@
                           <% } %>
                         </td>
                         <td class="text-center">
-                          <button type="button" class="btn btn-sm btn-outline-success" onclick="seleccionarPaciente('<%= pac.id_paciente %>', '<%= pac.nombres %>')" title="Agregar aseguradora">
+                          <button type="button" class="btn btn-sm btn-outline-success" onclick="seleccionarPaciente('<%= pac.id_paciente %>', '<%= pac.nombres %>', '<%= pac.ci %>')" title="Agregar aseguradora">
                             <i class="bi bi-plus-circle"></i>
                           </button>
                         </td>
@@ -210,10 +222,110 @@
 </div>
 
 <script>
-// Seleccionar paciente desde tabla
-function seleccionarPaciente(idPaciente, nombrePaciente) {
+// Variables globales
+let pacientesCache = [];
+let debounceTimer = null;
+
+// Función de búsqueda dinámica de pacientes
+async function buscarPacientes(query) {
+  const inputBuscar = document.getElementById('inputBuscarPaciente');
+  const dropdown = document.getElementById('listaPacientesDropdown');
+
+  if (!query || query.trim().length < 1) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  try {
+    const response = await fetch(`/aseguradoras/buscar-pacientes?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+
+    if (data.success && data.pacientes.length > 0) {
+      dropdown.innerHTML = '';
+      
+      data.pacientes.forEach(pac => {
+        const item = document.createElement('div');
+        item.className = 'p-2 border-bottom cursor-pointer hover-bg-light';
+        item.style.cursor = 'pointer';
+        item.innerHTML = `
+          <div class="fw-bold">${pac.nombre}</div>
+          <small class="text-muted">C.I.: ${pac.ci} | Celular: ${pac.celular}</small>
+        `;
+        
+        item.addEventListener('click', () => {
+          seleccionarPaciente(pac.id_paciente, pac.nombre, pac.ci);
+          dropdown.style.display = 'none';
+          inputBuscar.value = '';
+        });
+        
+        item.addEventListener('mouseenter', function() {
+          this.style.backgroundColor = '#f5f5f5';
+        });
+        
+        item.addEventListener('mouseleave', function() {
+          this.style.backgroundColor = 'transparent';
+        });
+        
+        dropdown.appendChild(item);
+      });
+      
+      dropdown.style.display = 'block';
+    } else {
+      dropdown.innerHTML = '<div class="p-3 text-muted text-center">No se encontraron pacientes</div>';
+      dropdown.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Error al buscar pacientes:', error);
+    dropdown.innerHTML = '<div class="p-3 text-danger text-center">Error en la búsqueda</div>';
+    dropdown.style.display = 'block';
+  }
+}
+
+// Event listener para búsqueda con debounce
+document.getElementById('inputBuscarPaciente').addEventListener('input', (e) => {
+  clearTimeout(debounceTimer);
+  const query = e.target.value.trim();
+
+  if (query.length === 0) {
+    document.getElementById('listaPacientesDropdown').style.display = 'none';
+    return;
+  }
+
+  debounceTimer = setTimeout(() => {
+    buscarPacientes(query);
+  }, 300);
+});
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', (e) => {
+  const dropdown = document.getElementById('listaPacientesDropdown');
+  const inputBuscar = document.getElementById('inputBuscarPaciente');
+  
+  if (!dropdown.contains(e.target) && e.target !== inputBuscar) {
+    dropdown.style.display = 'none';
+  }
+});
+
+// Seleccionar paciente desde búsqueda o tabla
+function seleccionarPaciente(idPaciente, nombrePaciente, ci = null) {
   document.getElementById('selectPaciente').value = idPaciente;
-  document.getElementById('selectAseguradora').focus();
+  
+  // Limpiar la búsqueda
+  document.getElementById('inputBuscarPaciente').value = '';
+  document.getElementById('listaPacientesDropdown').style.display = 'none';
+  
+  // Mostrar paciente seleccionado
+  if (ci) {
+    document.getElementById('pacienteSeleccionado').textContent = `Paciente seleccionado: ${nombrePaciente} (C.I.: ${ci})`;
+  } else {
+    document.getElementById('pacienteSeleccionado').textContent = `Paciente seleccionado: ${nombrePaciente}`;
+  }
+  
+  // Enfoque en aseguradora
+  setTimeout(() => {
+    document.getElementById('selectAseguradora').focus();
+  }, 100);
+  
   // Desplazar al formulario
   document.querySelector('.card-body').scrollIntoView({ behavior: 'smooth' });
 }
@@ -256,7 +368,9 @@ function asignarAseguradora() {
     if (data.success) {
       alert(data.mensaje);
       // Limpiar formulario
+      document.getElementById('inputBuscarPaciente').value = '';
       document.getElementById('selectPaciente').value = '';
+      document.getElementById('pacienteSeleccionado').textContent = '';
       document.getElementById('selectAseguradora').value = '';
       document.getElementById('inputPoliza').value = '';
       // Recargar página

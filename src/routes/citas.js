@@ -67,12 +67,12 @@ router.get('/citas/buscar-paciente', requireAuth, requireRole(['admin', 'ventani
             return res.json({ success: true, pacientes: [] });
         }
 
-        const [resultados] = await pool.query(
+        const resultadosResults = await pool.query(
             'CALL sp_pac_buscar(?, ?)',
             [termino, true]
         );
 
-        const pacientes = resultados && resultados.length > 0 ? resultados[0] : [];
+        const pacientes = (resultadosResults[0][0]) || [];
 
         res.json({
             success: true,
@@ -158,7 +158,7 @@ router.post('/citas', requireAuth, requireRole(['admin', 'ventanilla']), async (
             // Si falla por horario ocupado, sugerir alternativas
             if (result.mensaje.includes('Horario ocupado')) {
                 // Sugerir alternativas
-                const [alternativas] = await pool.query(
+                const alternativasResults = await pool.query(
                     'CALL sp_cita_sugerir_alternativas(?, ?, ?, 7)',
                     [id_personal, fechaFormato, hora_cita]
                 );
@@ -166,17 +166,38 @@ router.post('/citas', requireAuth, requireRole(['admin', 'ventanilla']), async (
                 return res.status(409).json({
                     success: false,
                     mensaje: result.mensaje,
-                    alternativas: alternativas && alternativas.length > 0 ? alternativas[0] : []
+                    alternativas: (alternativasResults[0][0]) || []
                 });
             }
 
             return res.status(400).json({ success: false, mensaje: result.mensaje });
         }
 
+        // Obtener información del servicio para el precio
+        const [servicioInfo] = await pool.query(
+            'SELECT precio FROM tservicio WHERE id_servicio = ? AND estado = 1',
+            [id_servicio]
+        );
+
+        const precio = servicioInfo && servicioInfo.length > 0 ? servicioInfo[0].precio : 0;
+        
+        // Obtener aseguradoras del paciente
+        const aseguradorasResults = await pool.query(
+            'CALL sp_paciente_obtener_aseguradoras(?)',
+            [id_paciente]
+        );
+
+        const aseguradorasList = (aseguradorasResults[0][0]) || [];
+
         res.json({
             success: true,
             mensaje: 'Cita creada exitosamente',
-            id_cita: result.id_cita
+            id_cita: result.id_cita,
+            precio: precio,
+            id_paciente: id_paciente,
+            id_servicio: id_servicio,
+            aseguradoras: aseguradorasList,
+            redirect: '/pagos'
         });
     } catch (error) {
         console.error('Error al crear cita:', error);
@@ -196,14 +217,15 @@ router.post('/citas', requireAuth, requireRole(['admin', 'ventanilla']), async (
 // GET /citas/agenda - Mostrar página de agenda con filtros
 router.get('/citas/agenda', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
     try {
-        const [medicosList] = await pool.query(
+        const medicosResults = await pool.query(
             'CALL sp_personal_listar_medicos()'
         );
 
-        const medicos = medicosList && medicosList.length > 0 ? medicosList[0].map(medico => ({
+        const medicosList = (medicosResults[0][0]) || [];
+        const medicos = medicosList.map(medico => ({
             id_personal: medico.id_personal,
             nombre_medico: `${medico.nombres} ${medico.apellido_paterno}`
-        })) : [];
+        }));
 
         res.render('citas/agenda', {
             user: req.user,
@@ -243,21 +265,21 @@ router.get('/citas/agenda/listar', requireAuth, requireRole(['admin', 'ventanill
         estado = estado || 'todas';
 
         // Obtener citas de la agenda
-        const [citas] = await pool.query(
+        const citasResults = await pool.query(
             'CALL sp_cita_consultar_agenda(?, ?, ?, ?)',
             [id_personal, fecha_inicio, fecha_fin, estado]
         );
 
         // Obtener conteos
-        const [conteos] = await pool.query(
+        const conteosResults = await pool.query(
             'CALL sp_cita_contar_agenda(?, ?, ?)',
             [id_personal, fecha_inicio, fecha_fin]
         );
 
         res.json({
             success: true,
-            citas: citas && citas.length > 0 ? citas[0] : [],
-            conteos: conteos && conteos.length > 0 ? conteos[0][0] : {}
+            citas: citasResults[0][0] || [],
+            conteos: (conteosResults[0][0] && conteosResults[0][0][0]) || {}
         });
     } catch (error) {
         console.error('Error al listar agenda:', error);
@@ -270,18 +292,51 @@ router.get('/citas/:id_cita', requireAuth, requireRole(['admin', 'ventanilla', '
     try {
         const { id_cita } = req.params;
 
-        const [detalles] = await pool.query(
-            'CALL sp_cita_obtener_detalles(?)',
+        // Consultar directamente con JOIN a tservicio para obtener el precio
+        const [cita] = await pool.query(
+            `SELECT 
+                c.id_cita,
+                c.id_paciente,
+                CONCAT(pa.nombre, ' ', pa.apellido_paterno, ' ', COALESCE(pa.apellido_materno, '')) AS nombre_paciente,
+                pa.celular,
+                pa.correo,
+                c.id_personal,
+                CONCAT(pe.nombres, ' ', pe.apellido_paterno) AS nombre_medico,
+                c.fecha_cita,
+                DATE_FORMAT(c.fecha_cita, '%d/%m/%Y') AS fecha_formato,
+                c.hora_cita,
+                TIME_FORMAT(c.hora_cita, '%H:%i') AS hora_formato,
+                c.id_servicio,
+                s.nombre AS nombre_servicio,
+                s.precio AS precio_servicio,
+                c.motivo_consulta,
+                c.observaciones,
+                c.motivo_cancelacion,
+                c.estado_cita,
+                c.nro_reprogramaciones,
+                CASE 
+                    WHEN EXISTS (
+                        SELECT 1 FROM tfactura_cliente 
+                        WHERE id_cita = c.id_cita AND estado = 1 AND metodo_pago IS NOT NULL
+                    ) THEN TRUE
+                    ELSE FALSE
+                END AS tiene_pago,
+                c.fecha_creacion
+            FROM tcita c
+            INNER JOIN tpaciente pa ON c.id_paciente = pa.id_paciente
+            INNER JOIN tpersonal pe ON c.id_personal = pe.id_personal
+            INNER JOIN tservicio s ON c.id_servicio = s.id_servicio
+            WHERE c.id_cita = ? AND c.estado = 1`,
             [id_cita]
         );
 
-        if (!detalles || detalles.length === 0 || detalles[0].length === 0) {
+        if (!cita || cita.length === 0) {
             return res.status(404).json({ success: false, mensaje: 'Cita no encontrada' });
         }
 
         res.json({
             success: true,
-            cita: detalles[0][0]
+            cita: cita[0]
         });
     } catch (error) {
         console.error('Error al obtener detalles:', error);
@@ -294,18 +349,20 @@ router.get('/citas/:id_cita/reprogramar', requireAuth, requireRole(['ventanilla'
     try {
         const { id_cita } = req.params;
 
-        const [detalles] = await pool.query(
+        const detallesResults = await pool.query(
             'CALL sp_cita_obtener_detalles(?)',
             [id_cita]
         );
 
-        if (!detalles || detalles.length === 0 || detalles[0].length === 0) {
+        const detallesArray = detallesResults[0][0] || [];
+
+        if (!detallesArray || detallesArray.length === 0) {
             return res.status(404).render('404', { user: req.user });
         }
 
         res.render('citas/reprogramar', {
             user: req.user,
-            cita: detalles[0][0]
+            cita: detallesArray[0]
         });
     } catch (error) {
         console.error('Error al cargar formulario reprogramar:', error);
@@ -317,25 +374,26 @@ router.get('/citas/:id_cita/reprogramar', requireAuth, requireRole(['ventanilla'
 router.post('/citas/:id_cita/reprogramar', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         const { id_cita } = req.params;
-        const { fecha_nueva, hora_nueva } = req.body;
+        const { nueva_fecha, nueva_hora } = req.body;
 
         // Validaciones
         const errors = [];
 
-        if (!fecha_nueva || fecha_nueva.trim() === '') {
+        if (!nueva_fecha || nueva_fecha.trim() === '') {
             errors.push('Fecha es obligatoria');
         } else {
-            const fechaRegex = /^\d{2}\/\d{2}\/\d{4}$/;
-            if (!fechaRegex.test(fecha_nueva.trim())) {
-                errors.push('Formato de fecha inválido. Use DD/MM/YYYY');
+            // Validar formato YYYY-MM-DD
+            const fechaRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!fechaRegex.test(nueva_fecha.trim())) {
+                errors.push('Formato de fecha inválido. Use YYYY-MM-DD');
             }
         }
 
-        if (!hora_nueva || hora_nueva.trim() === '') {
+        if (!nueva_hora || nueva_hora.trim() === '') {
             errors.push('Hora es obligatoria');
         } else {
             const horaRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-            if (!horaRegex.test(hora_nueva.trim())) {
+            if (!horaRegex.test(nueva_hora.trim())) {
                 errors.push('Hora debe ser en formato HH:MM');
             }
         }
@@ -344,14 +402,10 @@ router.post('/citas/:id_cita/reprogramar', requireAuth, requireRole(['admin', 'v
             return res.status(400).json({ success: false, mensaje: errors.join('. ') });
         }
 
-        // Convertir DD/MM/YYYY a YYYY-MM-DD
-        const [dia, mes, año] = fecha_nueva.split('/');
-        const fechaFormato = `${año}-${mes}-${dia}`;
-
         // Llamar al SP
         await pool.query(
             'CALL sp_cita_reprogramar(?, ?, ?, @p_success, @p_mensaje)',
-            [id_cita, fechaFormato, hora_nueva]
+            [id_cita, nueva_fecha, nueva_hora]
         );
 
         const [[result]] = await pool.query('SELECT @p_success AS success, @p_mensaje AS mensaje');
@@ -377,11 +431,16 @@ router.post('/citas/:id_cita/reprogramar', requireAuth, requireRole(['admin', 'v
 router.post('/citas/:id_cita/cancelar', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
         const { id_cita } = req.params;
+        const { motivo_cancelacion } = req.body;
+
+        if (!motivo_cancelacion || motivo_cancelacion.trim() === '') {
+            return res.status(400).json({ success: false, mensaje: 'El motivo de cancelación es requerido' });
+        }
 
         // Llamar al SP
         await pool.query(
-            'CALL sp_cita_cancelar(?, @p_success, @p_mensaje)',
-            [id_cita]
+            'CALL sp_cita_cancelar(?, ?, @p_success, @p_mensaje)',
+            [id_cita, motivo_cancelacion]
         );
 
         const [[result]] = await pool.query('SELECT @p_success AS success, @p_mensaje AS mensaje');
@@ -464,6 +523,19 @@ router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admi
         }
         const cita = citaArray[0];
 
+        // VALIDAR QUE LA CITA ESTÉ PAGADA
+        const [[pagado]] = await pool.query(
+            'SELECT COUNT(*) as cantidad FROM tfactura_cliente WHERE id_cita = ? AND estado = 1 AND metodo_pago IS NOT NULL',
+            [id_cita]
+        );
+
+        if (!pagado.cantidad || pagado.cantidad === 0) {
+            return res.status(400).json({ 
+                success: false, 
+                mensaje: 'La cita no ha sido pagada. Debe registrar un pago antes de marcar asistencia' 
+            });
+        }
+
         // Marcar como completada
         await pool.query(
             'CALL sp_cita_marcar_asistencia(?, @p_success, @p_mensaje)',
@@ -476,7 +548,7 @@ router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admi
             return res.status(400).json({ success: false, mensaje: result.mensaje });
         }
 
-        // Si tiene aseguradora seleccionada, crear ambas facturas
+        // Si tiene aseguradora seleccionada, crear factura de aseguradora
         if (id_aseguradora) {
             // Obtener datos de aseguradora
             const [aseguradoraData] = await pool.query(
@@ -488,35 +560,19 @@ router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admi
                 const aseguradora = aseguradoraData[0];
                 const porcentajeCobertura = aseguradora.porcentaje_cobertura;
                 
-                // Calcular montos
-                const montoAseguradora = (cita.precio_servicio * porcentajeCobertura) / 100;
-                const montoPaciente = cita.precio_servicio - montoAseguradora;
-                
-                console.log(`Facturación - Total: ${cita.precio_servicio}, Aseguradora: ${montoAseguradora}, Paciente: ${montoPaciente}`);
+                console.log(`Creando factura de aseguradora - Total: ${cita.precio_servicio}, Cobertura: ${porcentajeCobertura}%`);
                 
                 // Crear factura aseguradora
                 await pool.query(
                     'CALL sp_crear_factura_aseguradora(?, ?, ?, ?, ?, @p_id_fa, @p_success_fa, @p_msg_fa)',
                     [id_cita, id_aseguradora, cita.precio_servicio, porcentajeCobertura, cita.id_servicio]
                 );
-                
-                // Crear factura cliente con monto de diferencia
-                await pool.query(
-                    'CALL sp_crear_factura_cliente(?, ?, ?, ?, @p_id_fc, @p_success_fc, @p_msg_fc)',
-                    [id_cita, cita.id_paciente, montoPaciente, cita.id_servicio]
-                );
             }
-        } else {
-            // Sin aseguradora: crear solo factura cliente con monto total
-            await pool.query(
-                'CALL sp_crear_factura_cliente(?, ?, ?, ?, @p_id_fc, @p_success_fc, @p_msg_fc)',
-                [id_cita, cita.id_paciente, cita.precio_servicio, cita.id_servicio]
-            );
         }
 
         res.json({
             success: true,
-            mensaje: 'Cita marcada como completada. Facturas generadas exitosamente'
+            mensaje: 'Cita marcada como completada y facturas generadas exitosamente'
         });
     } catch (error) {
         console.error('Error al marcar asistencia:', error);

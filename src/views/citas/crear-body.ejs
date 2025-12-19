@@ -269,11 +269,21 @@
                             const data = await response.json();
 
                             if (data.success) {
-                                mostrarAlerta('Cita agendada exitosamente', 'success');
+                                mostrarAlerta('Cita agendada exitosamente. Redirigiendo a pagos...', 'success');
                                 document.getElementById('formCrearCita').reset();
+                                
+                                // Guardar datos de cita en sessionStorage para llevarlos a pagos
+                                sessionStorage.setItem('citaPagoPendiente', JSON.stringify({
+                                    id_cita: data.id_cita,
+                                    precio: data.precio,
+                                    id_paciente: data.id_paciente,
+                                    id_servicio: data.id_servicio,
+                                    aseguradoras: data.aseguradoras
+                                }));
+                                
                                 setTimeout(() => {
-                                    window.location.href = '/citas/crear';
-                                }, 2000);
+                                    window.location.href = data.redirect || '/pagos';
+                                }, 1500);
                             } else {
                                 // Si hay alternativas, mostrar modal
                                 if (data.alternativas && data.alternativas.length > 0) {

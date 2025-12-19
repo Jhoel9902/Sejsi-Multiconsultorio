@@ -308,6 +308,7 @@ DELIMITER ;
 DELIMITER //
 CREATE PROCEDURE `sp_cita_cancelar`(
     IN p_id_cita CHAR(36),
+    IN p_motivo_cancelacion VARCHAR(255),
     OUT p_success BOOLEAN,
     OUT p_mensaje VARCHAR(255)
 )
@@ -342,9 +343,10 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Estado inválido';
     END IF;
     
-    -- Cancelar: cambiar estado a 0
+    -- Cancelar: cambiar estado a cancelada y guardar motivo
     UPDATE tcita
-    SET estado = 0,
+    SET estado_cita = 'cancelada',
+        motivo_cancelacion = p_motivo_cancelacion,
         fecha_actualizacion = CURRENT_TIMESTAMP
     WHERE id_cita = p_id_cita;
     
@@ -366,6 +368,7 @@ BEGIN
         c.id_paciente,
         CONCAT(pa.nombre, ' ', pa.apellido_paterno, ' ', COALESCE(pa.apellido_materno, '')) AS nombre_paciente,
         pa.celular,
+        pa.correo,
         c.id_personal,
         CONCAT(pe.nombres, ' ', pe.apellido_paterno) AS nombre_medico,
         c.fecha_cita,
@@ -375,8 +378,10 @@ BEGIN
         CONCAT(DATE_FORMAT(c.fecha_cita, '%d/%m/%Y'), ' ', TIME_FORMAT(c.hora_cita, '%H:%i')) AS fecha_hora_completa,
         c.id_servicio,
         s.nombre AS nombre_servicio,
+        s.precio AS precio_servicio,
         c.motivo_consulta,
         c.observaciones,
+        c.motivo_cancelacion,
         c.estado_cita,
         c.nro_reprogramaciones,
         CASE 
@@ -386,6 +391,13 @@ BEGIN
             WHEN c.estado_cita = 'cancelada' THEN 'Cancelada'
             ELSE c.estado_cita
         END AS estado_mostrar,
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 FROM tfactura_cliente 
+                WHERE id_cita = c.id_cita AND estado = 1 AND metodo_pago IS NOT NULL
+            ) THEN TRUE
+            ELSE FALSE
+        END AS tiene_pago,
         c.fecha_creacion
     FROM tcita c
     INNER JOIN tpaciente pa ON c.id_paciente = pa.id_paciente
@@ -582,6 +594,7 @@ CREATE PROCEDURE `sp_cita_marcar_asistencia`(
 BEGIN
     DECLARE v_estado_cita VARCHAR(30);
     DECLARE v_error_msg VARCHAR(500);
+    DECLARE v_factura_pagada INT DEFAULT 0;
     
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -608,6 +621,18 @@ BEGIN
     IF v_estado_cita != 'confirmada' THEN
         SET v_error_msg = 'Solo se pueden completar citas confirmadas';
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Estado inválido';
+    END IF;
+    
+    -- VALIDAR QUE CITA ESTÉ PAGADA
+    SELECT COUNT(*) INTO v_factura_pagada
+    FROM tfactura_cliente
+    WHERE id_cita = p_id_cita 
+    AND estado = 1
+    AND metodo_pago IS NOT NULL;
+    
+    IF v_factura_pagada = 0 THEN
+        SET v_error_msg = 'La cita no ha sido pagada. Debe registrar un pago antes de marcar asistencia';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cita no pagada';
     END IF;
     
     -- Marcar como completada
@@ -640,10 +665,19 @@ BEGIN
         TIME_FORMAT(c.hora_cita, '%H:%i') AS hora_formato,
         c.id_servicio,
         s.nombre AS nombre_servicio,
+        s.precio AS precio_servicio,
         c.motivo_consulta,
         c.observaciones,
+        c.motivo_cancelacion,
         c.estado_cita,
         c.nro_reprogramaciones,
+        CASE 
+            WHEN EXISTS (
+                SELECT 1 FROM tfactura_cliente 
+                WHERE id_cita = c.id_cita AND estado = 1 AND metodo_pago IS NOT NULL
+            ) THEN TRUE
+            ELSE FALSE
+        END AS tiene_pago,
         c.fecha_creacion
     FROM tcita c
     INNER JOIN tpaciente pa ON c.id_paciente = pa.id_paciente
@@ -3147,112 +3181,18 @@ BEGIN
         SET p_msg = 'Servicio creado exitosamente';
     END IF;
 END//
-DELIMITER ;
-
-DELIMITER //
-CREATE PROCEDURE `sp_srv_listar`(
-    IN p_filtro VARCHAR(20)
-)
-BEGIN
-    IF p_filtro = 'activos' THEN
-        SELECT id_servicio, nombre, precio, descripcion, estado, fecha_creacion
-        FROM tservicio
-        WHERE estado = 1
-        ORDER BY nombre ASC;
-    ELSE
-        SELECT id_servicio, nombre, precio, descripcion, estado, fecha_creacion
-        FROM tservicio
-        ORDER BY nombre ASC;
-    END IF;
-END//
-DELIMITER ;
-
-DELIMITER //
-CREATE PROCEDURE `sp_srv_obtener`(
-    IN p_id_servicio CHAR(36)
-)
-BEGIN
-    SELECT id_servicio, nombre, precio, descripcion, estado, fecha_creacion
-    FROM tservicio
-    WHERE id_servicio = p_id_servicio;
-END//
-DELIMITER ;
-
-DELIMITER //
-CREATE PROCEDURE `sp_srv_toggle_estado`(
-    IN p_id_servicio CHAR(36),
-    OUT p_success BOOLEAN,
-    OUT p_msg VARCHAR(255),
-    OUT p_nuevo_estado TINYINT
-)
-BEGIN
-    DECLARE v_estado TINYINT;
-    
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        SET p_success = FALSE;
-        SET p_msg = 'Error al cambiar estado';
-        SET p_nuevo_estado = NULL;
-    END;
-    
-    IF NOT EXISTS(SELECT 1 FROM tservicio WHERE id_servicio = p_id_servicio) THEN
-        SET p_success = FALSE;
-        SET p_msg = 'Servicio no encontrado';
-        SET p_nuevo_estado = NULL;
-    ELSE
-        SELECT estado INTO v_estado FROM tservicio WHERE id_servicio = p_id_servicio;
-        SET p_nuevo_estado = IF(v_estado = 1, 0, 1);
-        
-        UPDATE tservicio SET estado = p_nuevo_estado WHERE id_servicio = p_id_servicio;
-        SET p_success = TRUE;
-        SET p_msg = 'Estado actualizado exitosamente';
-    END IF;
-END//
-DELIMITER //
-CREATE PROCEDURE `sp_srv_asignar_especialidad`(
-    IN p_id_servicio CHAR(36),
-    IN p_id_especialidad CHAR(36),
-    OUT p_success BOOLEAN,
-    OUT p_msg VARCHAR(255)
-)
-BEGIN
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        SET p_success = FALSE;
-        SET p_msg = 'Error al asignar especialidad al servicio';
-    END;
-    
-    IF NOT EXISTS(SELECT 1 FROM tservicio WHERE id_servicio = p_id_servicio) THEN
-        SET p_success = FALSE;
-        SET p_msg = 'Servicio no encontrado';
-    ELSEIF NOT EXISTS(SELECT 1 FROM tespecialidad WHERE id_especialidad = p_id_especialidad) THEN
-        SET p_success = FALSE;
-        SET p_msg = 'Especialidad no encontrada';
-    ELSEIF EXISTS(SELECT 1 FROM tservicio_especialidad WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad AND estado = 1) THEN
-        SET p_success = FALSE;
-        SET p_msg = 'Esta especialidad ya está asignada a este servicio';
-    ELSE
-        -- Si existe pero está inactiva, reactivarla
-        IF EXISTS(SELECT 1 FROM tservicio_especialidad WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad) THEN
-            UPDATE tservicio_especialidad
-            SET estado = 1
-            WHERE id_servicio = p_id_servicio AND id_especialidad = p_id_especialidad;
-        ELSE
-            INSERT INTO tservicio_especialidad (id_servicio, id_especialidad, estado)
-            VALUES (p_id_servicio, p_id_especialidad, 1);
-        END IF;
-        
-        SET p_success = TRUE;
-        SET p_msg = 'Especialidad asignada al servicio exitosamente';
-    END IF;
-END//
-DELIMITER ;
-
-DELIMITER //
-CREATE PROCEDURE `sp_srv_quitar_especialidad`(
-    IN p_id_servicio CHAR(36),
-    IN p_id_especialidad CHAR(36),
-    OUT p_success BOOLEAN,
+CREATE TABLE `tpago` (
+  `id_pago` CHAR(36) PRIMARY KEY,
+  `id_cita` CHAR(36) NOT NULL,
+  `id_factura_cliente` CHAR(36),
+  `monto` DECIMAL(12,2),
+  `metodo_pago` VARCHAR(50), -- efectivo, tarjeta, transferencia
+  `estado_pago` ENUM('pendiente', 'pagado', 'cancelado'),
+  `fecha_pago` DATETIME,
+  `estado` BOOLEAN DEFAULT TRUE,
+  `fecha_creacion` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`id_cita`) REFERENCES `tcita`(`id_cita`)
+);uccess BOOLEAN,
     OUT p_msg VARCHAR(255)
 )
 BEGIN
@@ -3315,6 +3255,168 @@ BEGIN
 END//
 DELIMITER ;
 
+DELIMITER ;
+
+-- ============================================
+-- NUEVOS PROCEDIMIENTOS PARA FLUJO DE PAGOS
+-- ============================================
+
+DELIMITER //
+CREATE PROCEDURE `sp_validar_pago_cita`(
+    IN p_id_cita CHAR(36),
+    OUT p_pagado BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_existe_cita INT DEFAULT 0;
+    DECLARE v_factura_pagada INT DEFAULT 0;
+    
+    SET p_pagado = FALSE;
+    SET p_mensaje = '';
+    
+    -- Validar que cita existe
+    SELECT COUNT(*) INTO v_existe_cita
+    FROM tcita
+    WHERE id_cita = p_id_cita AND estado = 1;
+    
+    IF v_existe_cita = 0 THEN
+        SET p_mensaje = 'Cita no encontrada';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cita no encontrada';
+    END IF;
+    
+    -- Verificar que existe al menos una factura cliente pagada
+    SELECT COUNT(*) INTO v_factura_pagada
+    FROM tfactura_cliente
+    WHERE id_cita = p_id_cita 
+    AND estado = 1
+    AND metodo_pago IS NOT NULL;
+    
+    IF v_factura_pagada > 0 THEN
+        SET p_pagado = TRUE;
+        SET p_mensaje = 'Cita pagada';
+    ELSE
+        SET p_pagado = FALSE;
+        SET p_mensaje = 'La cita no ha sido pagada. Debe registrar un pago antes de marcar asistencia';
+    END IF;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_crear_factura_cliente_por_pago`(
+    IN p_id_cita CHAR(36),
+    IN p_id_paciente CHAR(36),
+    IN p_precio_servicio DECIMAL(12,2),
+    IN p_id_servicio CHAR(36),
+    IN p_id_aseguradora CHAR(36),
+    OUT p_id_factura_cliente CHAR(36),
+    OUT p_monto_final DECIMAL(12,2),
+    OUT p_success BOOLEAN,
+    OUT p_mensaje VARCHAR(255)
+)
+BEGIN
+    DECLARE v_numero_factura VARCHAR(20);
+    DECLARE v_monto_aseguradora DECIMAL(12,2);
+    DECLARE v_error_msg VARCHAR(500);
+    DECLARE v_porcentaje_cobertura DECIMAL(5,2);
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        SET p_success = FALSE;
+        SET p_mensaje = CONCAT('Error: ', IFNULL(v_error_msg, 'Error al crear factura cliente'));
+        SET p_id_factura_cliente = NULL;
+        SET p_monto_final = 0;
+    END;
+    
+    SET p_success = FALSE;
+    SET p_mensaje = '';
+    SET p_id_factura_cliente = NULL;
+    SET p_monto_final = 0;
+    
+    -- Calcular monto final (descontar cobertura de aseguradora si existe)
+    IF p_id_aseguradora IS NOT NULL THEN
+        SELECT porcentaje_cobertura INTO v_porcentaje_cobertura
+        FROM taseguradora
+        WHERE id_aseguradora = p_id_aseguradora AND estado = 1;
+        
+        IF v_porcentaje_cobertura IS NOT NULL THEN
+            SET v_monto_aseguradora = (p_precio_servicio * v_porcentaje_cobertura) / 100;
+            SET p_monto_final = p_precio_servicio - v_monto_aseguradora;
+        ELSE
+            SET p_monto_final = p_precio_servicio;
+        END IF;
+    ELSE
+        SET p_monto_final = p_precio_servicio;
+    END IF;
+    
+    -- Generar número de factura
+    CALL sp_generar_numero_factura('cliente', v_numero_factura);
+    
+    -- Crear factura
+    SET p_id_factura_cliente = UUID();
+    INSERT INTO tfactura_cliente (
+        id_factura_cliente, id_cita, id_paciente, numero_factura,
+        subtotal, total, estado
+    ) VALUES (
+        p_id_factura_cliente, p_id_cita, p_id_paciente, v_numero_factura,
+        p_monto_final, p_monto_final, 1
+    );
+    
+    -- Crear detalle de factura
+    INSERT INTO tdetalle_factura_cliente (
+        id_factura_cliente, id_servicio, cantidad, precio_unitario, estado
+    ) VALUES (
+        p_id_factura_cliente, p_id_servicio, 1, p_monto_final, 1
+    );
+    
+    SET p_success = TRUE;
+    SET p_mensaje = 'Factura cliente creada exitosamente';
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_listar_facturas_aseguradora_vencidas`(
+    IN p_dias_vencimiento INT
+)
+BEGIN
+    -- p_dias_vencimiento = 90 para 3 meses
+    SELECT 
+        fa.id_factura_aseguradora,
+        fa.numero_factura,
+        a.nombre AS nombre_aseguradora,
+        fa.total_cubierto,
+        fa.fecha_emision,
+        DATEDIFF(CURDATE(), DATE(fa.fecha_emision)) AS dias_transcurridos,
+        CASE 
+            WHEN DATEDIFF(CURDATE(), DATE(fa.fecha_emision)) > p_dias_vencimiento THEN 'VENCIDA'
+            WHEN DATEDIFF(CURDATE(), DATE(fa.fecha_emision)) > (p_dias_vencimiento - 30) THEN 'POR VENCER'
+            ELSE 'VIGENTE'
+        END AS estado_vencimiento,
+        c.id_paciente,
+        p.nombre AS nombre_paciente,
+        s.nombre AS nombre_servicio
+    FROM tfactura_aseguradora fa
+    INNER JOIN taseguradora a ON fa.id_aseguradora = a.id_aseguradora
+    INNER JOIN tcita c ON fa.id_cita = c.id_cita
+    INNER JOIN tpaciente p ON c.id_paciente = p.id_paciente
+    INNER JOIN tservicio s ON c.id_servicio = s.id_servicio
+    WHERE fa.estado = 1 
+    AND DATEDIFF(CURDATE(), DATE(fa.fecha_emision)) >= (p_dias_vencimiento - 30)
+    ORDER BY fa.fecha_emision ASC;
+END//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE `sp_obtener_resumen_facturas_vencidas`()
+BEGIN
+    SELECT 
+        COUNT(*) AS total_facturas,
+        COUNT(CASE WHEN DATEDIFF(CURDATE(), DATE(fecha_emision)) > 90 THEN 1 END) AS vencidas_90_dias,
+        COUNT(CASE WHEN DATEDIFF(CURDATE(), DATE(fecha_emision)) > 60 THEN 1 END) AS vencidas_60_dias,
+        COALESCE(SUM(CASE WHEN DATEDIFF(CURDATE(), DATE(fecha_emision)) > 90 THEN total_cubierto ELSE 0 END), 0) AS monto_vencido,
+        COALESCE(SUM(total_cubierto), 0) AS monto_total
+    FROM tfactura_aseguradora
+    WHERE estado = 1 AND DATEDIFF(CURDATE(), DATE(fecha_emision)) >= 60;
+END//
 DELIMITER ;
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;

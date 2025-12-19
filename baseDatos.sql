@@ -65,6 +65,11 @@ CREATE TABLE IF NOT EXISTS `tcita` (
   CONSTRAINT `FK_cita_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tcita` (`id_cita`, `id_paciente`, `id_personal`, `id_servicio`, `fecha_cita`, `hora_cita`, `motivo_consulta`, `observaciones`, `estado_cita`, `nro_reprogramaciones`, `motivo_cancelacion`, `estado`, `fecha_creacion`, `fecha_actualizacion`) VALUES
+	('11852c53-dc88-11f0-924c-40c2ba62ef61', 'ab57d3d9-d864-11f0-9531-40c2ba62ef61', 'e8ad4426-da87-11f0-81e7-40c2ba62ef61', '22222222-2222-2222-2222-222222222010', '2025-12-25', '15:00:00', 'pago funciona?', NULL, 'confirmada', 0, NULL, 1, '2025-12-18 23:09:01', NULL),
+	('3f15e8b4-dc87-11f0-924c-40c2ba62ef61', 'c77409c2-da88-11f0-81e7-40c2ba62ef61', 'e8ad4426-da87-11f0-81e7-40c2ba62ef61', '22222222-2222-2222-2222-222222222012', '2025-12-25', '11:30:00', 'modo coito', NULL, 'confirmada', 0, NULL, 1, '2025-12-18 23:03:08', NULL),
+	('52279710-dc8a-11f0-924c-40c2ba62ef61', 'af470af8-d8fd-11f0-8c16-40c2ba62ef61', 'e8ad4426-da87-11f0-81e7-40c2ba62ef61', '22222222-2222-2222-2222-222222222010', '2025-12-22', '15:30:00', 'asd', NULL, 'confirmada', 0, NULL, 1, '2025-12-18 23:25:09', NULL),
+	('9796705c-dc89-11f0-924c-40c2ba62ef61', '7f0a48bb-da06-11f0-90da-40c2ba62ef61', 'e8ad4426-da87-11f0-81e7-40c2ba62ef61', '22222222-2222-2222-2222-222222222010', '2025-12-22', '15:00:00', 'asd', NULL, 'confirmada', 0, NULL, 1, '2025-12-18 23:19:56', NULL);
 
 CREATE TABLE IF NOT EXISTS `tdetalle_factura_aseguradora` (
   `id_detalle_aseg` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
@@ -101,6 +106,10 @@ CREATE TABLE IF NOT EXISTS `tdetalle_factura_cliente` (
   CONSTRAINT `FK_dfc_servicio` FOREIGN KEY (`id_servicio`) REFERENCES `tservicio` (`id_servicio`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tdetalle_factura_cliente` (`id_detalle_cliente`, `id_factura_cliente`, `id_servicio`, `descripcion`, `cantidad`, `precio_unitario`, `estado`, `fecha_creacion`) VALUES
+	('4886f7c2-dc92-11f0-924c-40c2ba62ef61', '4885f189-dc92-11f0-924c-40c2ba62ef61', '22222222-2222-2222-2222-222222222010', NULL, 1, 220.00, 1, '2025-12-19 00:22:08'),
+	('7f60b229-dc90-11f0-924c-40c2ba62ef61', '7f5fb35d-dc90-11f0-924c-40c2ba62ef61', '22222222-2222-2222-2222-222222222012', NULL, 1, 120.00, 1, '2025-12-19 00:09:21'),
+	('b6877c86-dc90-11f0-924c-40c2ba62ef61', 'b6866123-dc90-11f0-924c-40c2ba62ef61', '22222222-2222-2222-2222-222222222010', NULL, 1, 220.00, 1, '2025-12-19 00:10:54');
 
 CREATE TABLE IF NOT EXISTS `tespecialidad` (
   `id_especialidad` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
@@ -180,6 +189,10 @@ CREATE TABLE IF NOT EXISTS `tfactura_cliente` (
   CONSTRAINT `FK_fc_paciente` FOREIGN KEY (`id_paciente`) REFERENCES `tpaciente` (`id_paciente`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO `tfactura_cliente` (`id_factura_cliente`, `id_cita`, `id_paciente`, `fecha_emision`, `numero_factura`, `subtotal`, `total`, `metodo_pago`, `observaciones`, `estado`, `fecha_creacion`) VALUES
+	('4885f189-dc92-11f0-924c-40c2ba62ef61', '52279710-dc8a-11f0-924c-40c2ba62ef61', 'af470af8-d8fd-11f0-8c16-40c2ba62ef61', '2025-12-19 00:22:08', 'FAC-CL-2025-00003', 220.00, 220.00, 'tarjeta_debito', NULL, 1, '2025-12-19 00:22:08'),
+	('7f5fb35d-dc90-11f0-924c-40c2ba62ef61', '3f15e8b4-dc87-11f0-924c-40c2ba62ef61', 'c77409c2-da88-11f0-81e7-40c2ba62ef61', '2025-12-19 00:09:21', 'FAC-CL-2025-00001', 120.00, 120.00, NULL, NULL, 1, '2025-12-19 00:09:21'),
+	('b6866123-dc90-11f0-924c-40c2ba62ef61', '11852c53-dc88-11f0-924c-40c2ba62ef61', 'ab57d3d9-d864-11f0-9531-40c2ba62ef61', '2025-12-19 00:10:54', 'FAC-CL-2025-00002', 220.00, 220.00, NULL, NULL, 1, '2025-12-19 00:10:54');
 
 CREATE TABLE IF NOT EXISTS `thistorial_paciente` (
   `id_historial` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
@@ -876,7 +889,24 @@ INSERT INTO `tpaciente_aseguradora` (`id_paciente`, `id_aseguradora`, `numero_po
 	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b5710-da13-11f0-81c4-40c2ba62ef61', 'POL-84984as-45', '2025-12-15 20:44:35', NULL, 1),
 	('7f0a6ea8-da06-11f0-90da-40c2ba62ef61', 'e52b5c6c-da13-11f0-81c4-40c2ba62ef61', 'POL-2025-54564', '2025-12-15 20:44:03', NULL, 1),
 	('ab57d017-d864-11f0-9531-40c2ba62ef61', '314a7e50-da16-11f0-81c4-40c2ba62ef61', 'asdasd', '2025-12-16 04:20:53', NULL, 1),
-	('c77409c2-da88-11f0-81e7-40c2ba62ef61', '68f65393-da8e-11f0-81e7-40c2ba62ef61', 'dfasfdfd', '2025-12-16 10:50:30', NULL, 1);
+	('c77409c2-da88-11f0-81e7-40c2ba62ef61', '68f65393-da8e-11f0-81e7-40c2ba62ef61', 'dfasfdfd', '2025-12-16 10:50:30', NULL, 1),
+	('c77409c2-da88-11f0-81e7-40c2ba62ef61', 'e52b590d-da13-11f0-81c4-40c2ba62ef61', 'asdas', '2025-12-19 00:28:16', NULL, 1);
+
+CREATE TABLE IF NOT EXISTS `tpago` (
+  `id_pago` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_cita` char(36) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `id_factura_cliente` char(36) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `monto` decimal(12,2) DEFAULT NULL,
+  `metodo_pago` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `estado_pago` enum('pendiente','pagado','cancelado') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `fecha_pago` datetime DEFAULT NULL,
+  `estado` tinyint(1) DEFAULT '1',
+  `fecha_creacion` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id_pago`),
+  KEY `id_cita` (`id_cita`),
+  CONSTRAINT `tpago_ibfk_1` FOREIGN KEY (`id_cita`) REFERENCES `tcita` (`id_cita`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 CREATE TABLE IF NOT EXISTS `tpersonal` (
   `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT (uuid()),
@@ -939,7 +969,8 @@ CREATE TABLE IF NOT EXISTS `tpersonal_especialidad` (
 INSERT INTO `tpersonal_especialidad` (`id_personal`, `id_especialidad`, `fecha_asignacion`, `estado`) VALUES
 	('3910b567-da7f-11f0-9321-40c2ba62ef61', '11111111-1111-1111-1111-111111111001', '2025-12-18 18:25:35', 1),
 	('3910b567-da7f-11f0-9321-40c2ba62ef61', '11111111-1111-1111-1111-111111111009', '2025-12-18 18:25:30', 1),
-	('95c8ca08-d9e3-11f0-a245-40c2ba62ef61', '11111111-1111-1111-1111-111111111006', '2025-12-18 18:24:22', 1);
+	('95c8ca08-d9e3-11f0-a245-40c2ba62ef61', '11111111-1111-1111-1111-111111111006', '2025-12-18 18:24:22', 1),
+	('e8ad4426-da87-11f0-81e7-40c2ba62ef61', '11111111-1111-1111-1111-111111111004', '2025-12-18 23:02:40', 1);
 
 CREATE TABLE IF NOT EXISTS `tpersonal_horario` (
   `id_personal` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -957,6 +988,7 @@ INSERT INTO `tpersonal_horario` (`id_personal`, `id_horario`, `dia_descanso`, `f
 	('afd20c43-da2d-11f0-81c4-40c2ba62ef61', '213f9e18-dc1b-11f0-bfba-40c2ba62ef61', 'Lunes', '2025-12-18 17:38:34', 1),
 	('e8ad4426-da87-11f0-81e7-40c2ba62ef61', '213f87f8-dc1b-11f0-bfba-40c2ba62ef61', 'Viernes', '2025-12-18 10:34:11', 1),
 	('e8ad4426-da87-11f0-81e7-40c2ba62ef61', '213f8905-dc1b-11f0-bfba-40c2ba62ef61', 'Viernes', '2025-12-18 10:33:34', 1),
+	('e8ad4426-da87-11f0-81e7-40c2ba62ef61', '213f8b52-dc1b-11f0-bfba-40c2ba62ef61', 'Viernes', '2025-12-18 23:00:01', 1),
 	('e8ad4426-da87-11f0-81e7-40c2ba62ef61', '213f9530-dc1b-11f0-bfba-40c2ba62ef61', 'Viernes', '2025-12-18 16:07:28', 1),
 	('e8ad4426-da87-11f0-81e7-40c2ba62ef61', '213f9e4e-dc1b-11f0-bfba-40c2ba62ef61', 'Viernes', '2025-12-18 17:33:14', 1);
 
@@ -1064,7 +1096,8 @@ INSERT INTO `tservicio_especialidad` (`id_servicio_especialidad`, `id_servicio`,
 	('125090bd-dc60-11f0-8e5f-40c2ba62ef61', '22222222-2222-2222-2222-222222222018', '11111111-1111-1111-1111-111111111007', 1, '2025-12-18 18:22:43'),
 	('125091d8-dc60-11f0-8e5f-40c2ba62ef61', '22222222-2222-2222-2222-222222222019', '11111111-1111-1111-1111-111111111008', 1, '2025-12-18 18:22:43'),
 	('1250931a-dc60-11f0-8e5f-40c2ba62ef61', '22222222-2222-2222-2222-222222222020', '11111111-1111-1111-1111-111111111009', 1, '2025-12-18 18:22:43'),
-	('12509443-dc60-11f0-8e5f-40c2ba62ef61', '22222222-2222-2222-2222-222222222021', '11111111-1111-1111-1111-111111111010', 1, '2025-12-18 18:22:43');
+	('12509443-dc60-11f0-8e5f-40c2ba62ef61', '22222222-2222-2222-2222-222222222021', '11111111-1111-1111-1111-111111111010', 1, '2025-12-18 18:22:43'),
+	('56cadc0e-dc61-11f0-8e5f-40c2ba62ef61', '22222222-2222-2222-2222-222222222007', '11111111-1111-1111-1111-111111111009', 1, '2025-12-18 18:31:47');
 
 /*!40103 SET TIME_ZONE=IFNULL(@OLD_TIME_ZONE, 'system') */;
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

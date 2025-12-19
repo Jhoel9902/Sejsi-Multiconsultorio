@@ -9,12 +9,12 @@ router.get('/servicios', requireAuth, requireRole(['admin', 'ventanilla']), asyn
     try {
         const filtro = req.query.filtro || 'activos';
         
-        const [servicios] = await pool.query('CALL sp_srv_listar(?)', [filtro]);
+        const serviciosCallData = await pool.query('CALL sp_srv_listar(?)', [filtro]);
 
         res.render('servicios/lista', {
             title: 'Servicios',
             user: req.user,
-            servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
+            servicios: serviciosCallData[0][0],
             filtroActual: filtro
         });
     } catch (error) {
@@ -86,9 +86,9 @@ router.post('/servicios', requireAuth, requireRole(['admin']), async (req, res) 
 // GET /servicios/editar/:id - Mostrar formulario editar (admin solo)
 router.get('/servicios/editar/:id', requireAuth, requireRole(['admin']), async (req, res) => {
     try {
-        const [servicios] = await pool.query('CALL sp_srv_obtener(?)', [req.params.id]);
+        const serviciosCallData = await pool.query('CALL sp_srv_obtener(?)', [req.params.id]);
         
-        const servicio = Array.isArray(servicios) && servicios.length > 0 ? servicios[0][0] : null;
+        const servicio = serviciosCallData[0][0] && serviciosCallData[0][0].length > 0 ? serviciosCallData[0][0][0] : null;
         
         if (!servicio) {
             return res.status(404).render('404', { user: req.user });
@@ -124,8 +124,8 @@ router.post('/servicios/editar/:id', requireAuth, requireRole(['admin']), async 
         }
 
         if (errors.length > 0) {
-            const [servicios] = await pool.query('CALL sp_srv_obtener(?)', [id]);
-            const servicio = Array.isArray(servicios) && servicios.length > 0 ? servicios[0][0] : null;
+            const serviciosCallData = await pool.query('CALL sp_srv_obtener(?)', [id]);
+            const servicio = serviciosCallData[0][0] && serviciosCallData[0][0].length > 0 ? serviciosCallData[0][0][0] : null;
             return res.status(400).render('servicios/editar', {
                 title: 'Editar Servicio',
                 user: req.user,
@@ -143,8 +143,8 @@ router.post('/servicios/editar/:id', requireAuth, requireRole(['admin']), async 
         const [[result]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje');
 
         if (!result.success) {
-            const [servicios] = await pool.query('CALL sp_srv_obtener(?)', [id]);
-            const servicio = Array.isArray(servicios) && servicios.length > 0 ? servicios[0][0] : null;
+            const serviciosCallData = await pool.query('CALL sp_srv_obtener(?)', [id]);
+            const servicio = serviciosCallData[0][0] && serviciosCallData[0][0].length > 0 ? serviciosCallData[0][0][0] : null;
             return res.status(400).render('servicios/editar', {
                 title: 'Editar Servicio',
                 user: req.user,
@@ -186,9 +186,9 @@ router.post('/servicios/toggle-estado/:id', requireAuth, requireRole(['admin']),
 // GET /servicios/consultar/:id - Ver detalles del servicio (admin y ventanilla)
 router.get('/servicios/consultar/:id', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
     try {
-        const [servicios] = await pool.query('CALL sp_srv_obtener(?)', [req.params.id]);
+        const serviciosCallData = await pool.query('CALL sp_srv_obtener(?)', [req.params.id]);
         
-        const servicio = Array.isArray(servicios) && servicios.length > 0 ? servicios[0][0] : null;
+        const servicio = serviciosCallData[0][0] && serviciosCallData[0][0].length > 0 ? serviciosCallData[0][0][0] : null;
         
         if (!servicio) {
             return res.status(404).render('404', { user: req.user });
@@ -209,12 +209,12 @@ router.get('/servicios/consultar/:id', requireAuth, requireRole(['admin', 'venta
 router.get('/servicios/relacionar-especialidad', requireAuth, requireRole(['admin']), async (req, res) => {
     try {
         // Obtener lista de servicios activos
-        const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
-        const serviciosList = Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [];
+        const serviciosCallData = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+        const serviciosList = serviciosCallData[0][0];
 
         // Obtener lista de especialidades activas
-        const [especialidades] = await pool.query('CALL sp_esp_listar()');
-        const especialidadesList = Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [];
+        const espsCallData = await pool.query('CALL sp_esp_listar()');
+        const especialidadesList = espsCallData[0][0];
 
         res.render('servicios/relacionar-especialidad', {
             title: 'Relacionar Especialidad con Servicio',
@@ -236,14 +236,14 @@ router.post('/servicios/asignar-especialidad', requireAuth, requireRole(['admin'
         const { id_servicio, id_especialidad } = req.body;
 
         if (!id_servicio || !id_especialidad) {
-            const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
-            const [especialidades] = await pool.query('CALL sp_esp_listar()');
+            const serviciosCallData = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+            const espsCallData = await pool.query('CALL sp_esp_listar()');
             
             return res.render('servicios/relacionar-especialidad', {
                 title: 'Relacionar Especialidad con Servicio',
                 user: req.user,
-                servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
-                especialidades: Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [],
+                servicios: serviciosCallData[0][0],
+                especialidades: espsCallData[0][0],
                 error: 'Debe seleccionar un servicio y una especialidad',
                 success: null
             });
@@ -256,26 +256,26 @@ router.post('/servicios/asignar-especialidad', requireAuth, requireRole(['admin'
         const [[result]] = await pool.query('SELECT @p_success AS success, @p_msg AS mensaje');
 
         if (result.success) {
-            const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
-            const [especialidades] = await pool.query('CALL sp_esp_listar()');
+            const serviciosCallData = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+            const espsCallData = await pool.query('CALL sp_esp_listar()');
             
             return res.render('servicios/relacionar-especialidad', {
                 title: 'Relacionar Especialidad con Servicio',
                 user: req.user,
-                servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
-                especialidades: Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [],
+                servicios: serviciosCallData[0][0],
+                especialidades: espsCallData[0][0],
                 error: null,
                 success: result.mensaje
             });
         } else {
-            const [servicios] = await pool.query('CALL sp_srv_listar(?)', ['activos']);
-            const [especialidades] = await pool.query('CALL sp_esp_listar()');
+            const serviciosCallData = await pool.query('CALL sp_srv_listar(?)', ['activos']);
+            const espsCallData = await pool.query('CALL sp_esp_listar()');
             
             return res.render('servicios/relacionar-especialidad', {
                 title: 'Relacionar Especialidad con Servicio',
                 user: req.user,
-                servicios: Array.isArray(servicios) && servicios.length > 0 ? servicios[0] : [],
-                especialidades: Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : [],
+                servicios: serviciosCallData[0][0],
+                especialidades: espsCallData[0][0],
                 error: result.mensaje,
                 success: null
             });
@@ -291,8 +291,8 @@ router.get('/servicios/obtener-especialidades/:id', requireAuth, requireRole(['a
     try {
         const { id } = req.params;
 
-        const [result] = await pool.query('CALL sp_srv_obtener_especialidades(?)', [id]);
-        const especialidades = Array.isArray(result) && result.length > 0 ? result[0] : [];
+        const resultCallData = await pool.query('CALL sp_srv_obtener_especialidades(?)', [id]);
+        const especialidades = resultCallData[0][0];
 
         res.json({ success: true, especialidades });
     } catch (error) {

@@ -196,6 +196,18 @@
             color: #856404;
         }
 
+        .card.border-left-primary {
+            border-left: 4px solid #667eea;
+        }
+
+        .bg-success-light {
+            background-color: #d1e7dd;
+        }
+
+        .bg-warning-light {
+            background-color: #fff3cd;
+        }
+
         @media (max-width: 768px) {
             .medico-selector-container {
                 padding: 1.5rem;
@@ -281,6 +293,21 @@
     <div id="calendario" style="display: none;"></div>
 </div>
 
+<!-- Modal Citas del Día -->
+<div class="modal fade" id="modalCitasDia" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Citas del <span id="dia-seleccionado"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="citas-dia-content">
+                <!-- Se llena dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Detalles -->
 <div class="modal fade" id="modalDetalles" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -314,16 +341,112 @@
     </div>
 </div>
 
-<!-- Modal Citas del Día -->
-<div class="modal fade" id="modalCitasDia" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<!-- Modal Reprogramar Cita -->
+<div class="modal fade" id="modalReprogramar" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Citas del <span id="dia-seleccionado"></span></h5>
+                <h5 class="modal-title"><i class="bi bi-calendar-event me-2"></i>Reprogramar Cita</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="citas-dia-content">
-                <!-- Se llena dinámicamente -->
+            <div class="modal-body">
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Nota:</strong> Solo puedes reprogramar una cita una sola vez.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Fecha Actual</strong></label>
+                    <input type="text" class="form-control" id="fecha-actual" disabled>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Nueva Fecha <span class="text-danger">*</strong></label>
+                    <input type="date" class="form-control" id="nueva-fecha">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Nueva Hora <span class="text-danger">*</strong></label>
+                    <input type="time" class="form-control" id="nueva-hora">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="confirmarReprogramacion()">
+                    <i class="bi bi-check-circle me-2"></i>Reprogramar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cancelar Cita -->
+<!-- Modal Pagar Cita Directa -->
+<div class="modal fade" id="modalPagarCita" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-cash-circle me-2"></i>Pagar Cita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Se generará una factura automáticamente</strong>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Aseguradora (opcional)</strong></label>
+                    <select class="form-control" id="aseguradora_pago_cita">
+                        <option value="">-- Sin aseguradora --</option>
+                    </select>
+                    <small class="text-muted">Si seleccionas una aseguradora, se creará factura también para ella con su cobertura</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Método de Pago <span class="text-danger">*</span></strong></label>
+                    <select class="form-control" id="metodo_pago_cita">
+                        <option value="">-- Selecciona un método --</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta_debito">Tarjeta Débito</option>
+                        <option value="tarjeta_credito">Tarjeta Crédito</option>
+                        <option value="transferencia">Transferencia Bancaria</option>
+                        <option value="cheque">Cheque</option>
+                    </select>
+                </div>
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Monto a pagar: <strong id="monto_pago_cita">-</strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="confirmarPagoCita()">
+                    <i class="bi bi-check-circle me-2"></i>Confirmar Pago
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCancelarCita" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i>Cancelar Cita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Advertencia:</strong> Esta acción no se puede deshacer.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Motivo de Cancelación <span class="text-danger">*</strong></label>
+                    <textarea class="form-control" id="motivo-cancelacion" rows="4" placeholder="Especifica el motivo de la cancelación..."></textarea>
+                    <small class="form-text text-muted">Máximo 255 caracteres</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="confirmarCancelarCita()">
+                    <i class="bi bi-check-circle me-2"></i>Confirmar Cancelación
+                </button>
             </div>
         </div>
     </div>
@@ -429,7 +552,17 @@
             height: 'auto',
             eventDidMount(info) {
                 info.el.style.cursor = 'pointer';
-                info.el.addEventListener('click', () => mostrarCitaDelDia(info.event.startStr));
+                info.el.addEventListener('click', () => {
+                    // Obtener el ID de la cita del evento
+                    const id_cita = info.event.id;
+                    if (id_cita) {
+                        // Abrir directamente el modal de detalles
+                        verDetalles(id_cita);
+                    } else {
+                        // Fallback: mostrar citas del día
+                        mostrarCitaDelDia(info.event.startStr);
+                    }
+                });
             },
             datesSet() {
                 cargarCitasDelMedico();
@@ -521,68 +654,150 @@
             day: 'numeric'
         });
 
+        // Separar citas por estado
+        const citasActivas = citas.filter(c => c.estado_cita !== 'cancelada');
+        const citasCanceladas = citas.filter(c => c.estado_cita === 'cancelada');
+
         let htmlContent = '<div class="citas-list">';
-        citas.forEach(cita => {
-            const estadoBadge = {
-                confirmada: '<span class="badge bg-success">Confirmada</span>',
-                completada: '<span class="badge bg-info">Completada</span>',
-                cancelada: '<span class="badge bg-danger">Cancelada</span>'
-            }[cita.estado_cita] || '<span class="badge bg-secondary">Desconocido</span>';
 
-            htmlContent += `
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="row mb-2">
-                            <div class="col-md-8">
-                                <h6 class="card-subtitle mb-2"><strong>${cita.hora_formato}</strong> - ${cita.nombre_paciente}</h6>
-                                <p class="text-muted mb-2">
-                                    <small>📞 ${cita.celular || '-'} | 📧 ${cita.correo || '-'}</small>
-                                </p>
-                                <p class="text-muted mb-2">
-                                    <small>💊 ${cita.nombre_servicio}</small>
-                                </p>
-                                <p>${estadoBadge}</p>
-                            </div>
-                            <div class="col-md-4 text-end">
-                                <button class="btn btn-sm btn-primary" onclick="verDetalles('${cita.id_cita}')">
-                                    Ver Detalles
-                                </button>
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-12">
-            `;
+        // Mostrar citas activas
+        if (citasActivas.length > 0) {
+            htmlContent += '<h6 class="mt-3 mb-2">📅 <strong>Citas Activas</strong></h6>';
+            citasActivas.forEach(cita => {
+                htmlContent += renderCitaCard(cita);
+            });
+        }
 
-            if (userRole === 'ventanilla' && cita.estado_cita === 'confirmada') {
-                if (cita.nro_reprogramaciones === 0) {
-                    htmlContent += `
-                        <a href="/citas/${cita.id_cita}/reprogramar" class="btn btn-sm btn-warning">
-                            Reprogramar
-                        </a>
-                    `;
-                }
-                htmlContent += `
-                    <button class="btn btn-sm btn-success" onclick="abrirModalAsistencia('${cita.id_cita}')">
-                        Marcar Asistencia
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="cancelarCita('${cita.id_cita}')">
-                        Cancelar
-                    </button>
-                `;
-            }
+        // Mostrar citas canceladas
+        if (citasCanceladas.length > 0) {
+            htmlContent += '<h6 class="mt-4 mb-2 text-danger">❌ <strong>Citas Canceladas</strong></h6>';
+            citasCanceladas.forEach(cita => {
+                htmlContent += renderCitaCanceladaCard(cita);
+            });
+        }
 
-            htmlContent += `
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
         htmlContent += '</div>';
 
         document.getElementById('dia-seleccionado').textContent = fechaFormato;
         document.getElementById('citas-dia-content').innerHTML = htmlContent;
         new bootstrap.Modal(document.getElementById('modalCitasDia')).show();
+    }
+
+    function renderCitaCard(cita) {
+        const estadoBadge = {
+            confirmada: '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Confirmada</span>',
+            completada: '<span class="badge bg-info"><i class="bi bi-check-double me-1"></i>Completada</span>',
+            cancelada: '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Cancelada</span>'
+        }[cita.estado_cita] || '<span class="badge bg-secondary">Desconocido</span>';
+
+        const pagoBadge = cita.tiene_pago 
+            ? '<span class="badge bg-success-light border border-success text-success"><i class="bi bi-credit-card me-1"></i>Pagado</span>'
+            : '<span class="badge bg-warning-light border border-warning text-warning"><i class="bi bi-exclamation-circle me-1"></i>Pendiente Pago</span>';
+
+        let botonesAccion = '';
+        
+        if (userRole === 'ventanilla') {
+            if (cita.estado_cita === 'confirmada') {
+                // Botón reprogramar (máximo 1 vez)
+                if (cita.nro_reprogramaciones === 0) {
+                    botonesAccion += `
+                        <button class="btn btn-sm btn-warning me-2" onclick="abrirModalReprogramar('${cita.id_cita}', '${cita.fecha_cita}', '${cita.hora_cita}')">
+                            <i class="bi bi-calendar-event me-1"></i>Reprogramar
+                        </button>
+                    `;
+                }
+
+                // Botón marcar asistencia (solo si está pagado)
+                if (cita.tiene_pago) {
+                    botonesAccion += `
+                        <button class="btn btn-sm btn-success me-2" onclick="abrirModalAsistencia('${cita.id_cita}')">
+                            <i class="bi bi-check2-circle me-1"></i>Marcar Asistencia
+                        </button>
+                    `;
+                } else {
+                    botonesAccion += `
+                        <button class="btn btn-sm btn-success me-2" disabled title="Requiere pago">
+                            <i class="bi bi-check2-circle me-1"></i>Marcar Asistencia
+                        </button>
+                    `;
+                }
+
+                // Botón cancelar
+                botonesAccion += `
+                    <button class="btn btn-sm btn-danger" onclick="abrirModalCancelar('${cita.id_cita}')">
+                        <i class="bi bi-x-circle me-1"></i>Cancelar
+                    </button>
+                `;
+            } else if (cita.estado_cita === 'completada') {
+                botonesAccion += '<span class="badge bg-info"><i class="bi bi-check-all me-1"></i>Cita Completada</span>';
+            }
+        }
+
+        return `
+            <div class="card mb-3 border-left-primary">
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-md-8">
+                            <h6 class="card-subtitle mb-2">
+                                <i class="bi bi-clock me-2"></i><strong>${cita.hora_formato}</strong> - ${cita.nombre_paciente}
+                            </h6>
+                            <p class="text-muted mb-2">
+                                <small>
+                                    <i class="bi bi-telephone me-1"></i>${cita.celular || '-'} | 
+                                    <i class="bi bi-envelope me-1"></i>${cita.correo || '-'}
+                                </small>
+                            </p>
+                            <p class="text-muted mb-2">
+                                <small><i class="bi bi-capsule me-1"></i>${cita.nombre_servicio}</small>
+                            </p>
+                            <p class="mb-1">${estadoBadge} ${pagoBadge}</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-sm btn-primary" onclick="verDetalles('${cita.id_cita}')">
+                                <i class="bi bi-info-circle me-1"></i>Detalles
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            ${botonesAccion}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderCitaCanceladaCard(cita) {
+        return `
+            <div class="card mb-3 border border-danger bg-light opacity-75">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6 class="card-subtitle mb-2">
+                                <i class="bi bi-clock me-2"></i><strong>${cita.hora_formato}</strong> - ${cita.nombre_paciente}
+                            </h6>
+                            <p class="text-muted mb-2">
+                                <small><i class="bi bi-capsule me-1"></i>${cita.nombre_servicio}</small>
+                            </p>
+                            <p class="mb-0">
+                                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Cancelada</span>
+                            </p>
+                            ${cita.motivo_cancelacion ? `
+                                <p class="text-muted small mt-2 mb-0">
+                                    <i class="bi bi-exclamation-circle me-1"></i><strong>Motivo:</strong> ${cita.motivo_cancelacion}
+                                </p>
+                            ` : ''}
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <button class="btn btn-sm btn-outline-danger" onclick="verDetalles('${cita.id_cita}')">
+                                <i class="bi bi-info-circle me-1"></i>Ver Detalles
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     async function verDetalles(id_cita) {
@@ -596,37 +811,122 @@
             }
 
             const cita = data.cita;
+            citaActualModal = cita; // Guardar cita actual en variable global
+            const pagoBadge = cita.tiene_pago 
+                ? '<span class="badge bg-success"><i class="bi bi-credit-card me-1"></i>Pagado</span>'
+                : '<span class="badge bg-warning"><i class="bi bi-exclamation-circle me-1"></i>Pendiente Pago</span>';
+
+            const estadoBadge = {
+                confirmada: '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Confirmada</span>',
+                completada: '<span class="badge bg-info"><i class="bi bi-check-double me-1"></i>Completada</span>',
+                cancelada: '<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Cancelada</span>'
+            }[cita.estado_cita] || '<span class="badge bg-secondary">Desconocido</span>';
+
+            // Generar botones de acción
+            let botonesAccion = '';
+            if (userRole === 'ventanilla') {
+                if (cita.estado_cita === 'confirmada') {
+                    // Botón reprogramar (máximo 1 vez)
+                    if (cita.nro_reprogramaciones === 0) {
+                        botonesAccion += `
+                            <button class="btn btn-warning me-2" onclick="abrirModalReprogramar('${cita.id_cita}', '${cita.fecha_cita}', '${cita.hora_cita}')">
+                                <i class="bi bi-calendar-event me-1"></i>Reprogramar
+                            </button>
+                        `;
+                    }
+
+                    // Botón pagar (solo si no está pagado)
+                    if (!cita.tiene_pago) {
+                        botonesAccion += `
+                            <button class="btn btn-success me-2" onclick="abrirModalPagarCita('${cita.id_cita}')">
+                                <i class="bi bi-cash me-1"></i>Pagar Cita
+                            </button>
+                        `;
+                    }
+
+                    // Botón marcar asistencia (solo si está pagado)
+                    if (cita.tiene_pago) {
+                        botonesAccion += `
+                            <button class="btn btn-info me-2" onclick="abrirModalAsistencia('${cita.id_cita}')">
+                                <i class="bi bi-check2-circle me-1"></i>Marcar Asistencia
+                            </button>
+                        `;
+                    } else {
+                        botonesAccion += `
+                            <button class="btn btn-info me-2" disabled title="Requiere pago">
+                                <i class="bi bi-check2-circle me-1"></i>Marcar Asistencia
+                            </button>
+                        `;
+                    }
+
+                    // Botón cancelar
+                    botonesAccion += `
+                        <button class="btn btn-danger" onclick="abrirModalCancelar('${cita.id_cita}')">
+                            <i class="bi bi-x-circle me-1"></i>Cancelar
+                        </button>
+                    `;
+                }
+            }
+
             const detallesHtml = `
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <p><strong>ID Cita:</strong> ${cita.id_cita}</p>
-                        <p><strong>Paciente:</strong> ${cita.nombre_paciente}</p>
-                        <p><strong>Teléfono:</strong> ${cita.celular || '-'}</p>
-                        <p><strong>Email:</strong> ${cita.correo || '-'}</p>
+                        <p><strong><i class="bi bi-card-heading me-2"></i>ID Cita:</strong> <code>${cita.id_cita}</code></p>
+                        <p><strong><i class="bi bi-person me-2"></i>Paciente:</strong> ${cita.nombre_paciente}</p>
+                        <p><strong><i class="bi bi-telephone me-2"></i>Teléfono:</strong> ${cita.celular || '-'}</p>
+                        <p><strong><i class="bi bi-envelope me-2"></i>Email:</strong> ${cita.correo || '-'}</p>
                     </div>
                     <div class="col-md-6">
-                        <p><strong>Médico:</strong> ${cita.nombre_medico}</p>
-                        <p><strong>Fecha/Hora:</strong> ${cita.fecha_formato} a las ${cita.hora_formato}</p>
-                        <p><strong>Servicio:</strong> ${cita.nombre_servicio}</p>
-                        <p><strong>Estado:</strong> <span class="badge bg-primary">${cita.estado_cita}</span></p>
+                        <p><strong><i class="bi bi-stethoscope me-2"></i>Médico:</strong> ${cita.nombre_medico}</p>
+                        <p><strong><i class="bi bi-calendar-event me-2"></i>Fecha/Hora:</strong> ${cita.fecha_formato} a las ${cita.hora_formato}</p>
+                        <p><strong><i class="bi bi-capsule me-2"></i>Servicio:</strong> ${cita.nombre_servicio}</p>
+                        <p><strong><i class="bi bi-money me-2"></i>Precio:</strong> $${parseFloat(cita.precio_servicio).toFixed(2)}</p>
                     </div>
                 </div>
-                <div class="row">
+                <div class="row mb-3">
                     <div class="col-md-12">
-                        <p><strong>Motivo Consulta:</strong></p>
-                        <p class="border p-2 bg-light">${cita.motivo_consulta || 'N/A'}</p>
+                        <p><strong>Estado:</strong> ${estadoBadge} ${cita.estado_cita !== 'cancelada' ? pagoBadge : ''}</p>
                     </div>
                 </div>
-                <div class="row">
+                <hr>
+                <div class="row mb-3">
                     <div class="col-md-12">
-                        <p><strong>Observaciones:</strong></p>
-                        <p class="border p-2 bg-light">${cita.observaciones || 'N/A'}</p>
+                        <p><strong><i class="bi bi-chat-dots me-2"></i>Motivo Consulta:</strong></p>
+                        <div class="border p-2 bg-light rounded" style="min-height: 60px;">
+                            ${cita.motivo_consulta || '<em class="text-muted">Sin motivo especificado</em>'}
+                        </div>
                     </div>
                 </div>
-                <div class="row mt-3">
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <p><strong><i class="bi bi-sticky-note me-2"></i>Observaciones:</strong></p>
+                        <div class="border p-2 bg-light rounded" style="min-height: 60px;">
+                            ${cita.observaciones || '<em class="text-muted">Sin observaciones</em>'}
+                        </div>
+                    </div>
+                </div>
+                ${cita.motivo_cancelacion ? `
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <p><strong><i class="bi bi-exclamation-triangle me-2"></i>Motivo Cancelación:</strong></p>
+                            <div class="border border-danger p-2 bg-light rounded" style="min-height: 60px;">
+                                ${cita.motivo_cancelacion}
+                            </div>
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="row mb-4">
                     <div class="col-md-6">
-                        <p><strong>Reprogramaciones:</strong> ${cita.nro_reprogramaciones}</p>
-                        <p><strong>Fecha Creación:</strong> ${cita.fecha_creacion ? new Date(cita.fecha_creacion).toLocaleString() : 'N/A'}</p>
+                        <p><strong><i class="bi bi-arrow-counterclockwise me-2"></i>Reprogramaciones:</strong> ${cita.nro_reprogramaciones} / 1</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong><i class="bi bi-clock-history me-2"></i>Creada:</strong> ${cita.fecha_creacion ? new Date(cita.fecha_creacion).toLocaleString('es-ES') : 'N/A'}</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-12">
+                        ${botonesAccion || '<p class="text-muted text-center">No hay acciones disponibles para esta cita</p>'}
                     </div>
                 </div>
             `;
@@ -639,26 +939,37 @@
         }
     }
 
-    function mostrarAlerta(mensaje, tipo = 'danger') {
-        const alertasDiv = document.getElementById('alertas');
-        alertasDiv.innerHTML = `
-            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
-                ${mensaje}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        setTimeout(() => alertasDiv.innerHTML = '', 4000);
+    let citaActualId = null;
+
+    function abrirModalReprogramar(id_cita, fecha, hora) {
+        citaActualId = id_cita;
+        const fechaObj = new Date(fecha);
+        const fechaFormato = fechaObj.toISOString().split('T')[0];
+        
+        document.getElementById('fecha-actual').value = `${fechaFormato} a las ${hora}`;
+        document.getElementById('nueva-fecha').value = '';
+        document.getElementById('nueva-hora').value = '';
+        
+        new bootstrap.Modal(document.getElementById('modalReprogramar')).show();
     }
 
-    async function cancelarCita(id_cita) {
-        if (!confirm('¿Estás seguro de que deseas cancelar esta cita?')) {
+    async function confirmarReprogramacion() {
+        const nuevaFecha = document.getElementById('nueva-fecha').value;
+        const nuevaHora = document.getElementById('nueva-hora').value;
+
+        if (!nuevaFecha || !nuevaHora) {
+            mostrarAlerta('Por favor completa todos los campos', 'warning');
             return;
         }
 
         try {
-            const response = await fetch(`/citas/${id_cita}/cancelar`, {
+            const response = await fetch(`/citas/${citaActualId}/reprogramar`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nueva_fecha: nuevaFecha,
+                    nueva_hora: nuevaHora
+                })
             });
 
             const data = await response.json();
@@ -668,11 +979,53 @@
                 return;
             }
 
+            bootstrap.Modal.getInstance(document.getElementById('modalReprogramar')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('modalCitasDia')).hide();
             mostrarAlerta('✅ ' + data.mensaje, 'success');
             setTimeout(() => cargarCitasDelMedico(), 1000);
-            
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalCitasDia'));
-            if (modal) modal.hide();
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al reprogramar cita', 'danger');
+        }
+    }
+
+    function abrirModalCancelar(id_cita) {
+        citaActualId = id_cita;
+        document.getElementById('motivo-cancelacion').value = '';
+        new bootstrap.Modal(document.getElementById('modalCancelarCita')).show();
+    }
+
+    async function confirmarCancelarCita() {
+        const motivo = document.getElementById('motivo-cancelacion').value.trim();
+
+        if (!motivo) {
+            mostrarAlerta('Por favor especifica un motivo de cancelación', 'warning');
+            return;
+        }
+
+        if (motivo.length > 255) {
+            mostrarAlerta('El motivo no puede exceder 255 caracteres', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/citas/${citaActualId}/cancelar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ motivo_cancelacion: motivo })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('modalCancelarCita')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('modalCitasDia')).hide();
+            mostrarAlerta('✅ ' + data.mensaje, 'success');
+            setTimeout(() => cargarCitasDelMedico(), 1000);
         } catch (error) {
             console.error('Error:', error);
             mostrarAlerta('Error al cancelar cita', 'danger');
@@ -768,6 +1121,87 @@
         } catch (error) {
             console.error('Error:', error);
             mostrarAlerta('Error al marcar asistencia', 'danger');
+        }
+    }
+
+    let citaActualPago = null;
+    let citaActualModal = null;
+    let montoActualPago = null;
+
+    async function abrirModalPagarCita(id_cita) {
+        citaActualPago = id_cita;
+        
+        // Obtener el monto desde la cita guardada
+        const monto = citaActualModal?.precio_servicio || 0;
+        
+        // Validar que monto sea un número válido
+        if (!monto || isNaN(monto) || monto <= 0) {
+            console.error('No se pudo cargar el precio del servicio. Precio:', monto);
+            return;
+        }
+        
+        montoActualPago = monto;
+        document.getElementById('metodo_pago_cita').value = '';
+        document.getElementById('monto_pago_cita').textContent = '$' + parseFloat(monto).toFixed(2);
+        
+        // Cargar aseguradoras del paciente
+        try {
+            const response = await fetch(`/pagos/aseguradoras-paciente/${citaActualModal?.id_paciente}`);
+            const data = await response.json();
+            
+            if (data.success && data.aseguradoras.length > 0) {
+                const selectAseg = document.getElementById('aseguradora_pago_cita');
+                selectAseg.innerHTML = '<option value="">-- Sin aseguradora --</option>';
+                
+                data.aseguradoras.forEach(aseg => {
+                    const option = document.createElement('option');
+                    option.value = aseg.id_aseguradora;
+                    option.textContent = `${aseg.nombre} (${aseg.porcentaje_cobertura}%)`;
+                    selectAseg.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error al cargar aseguradoras:', error);
+        }
+        
+        new bootstrap.Modal(document.getElementById('modalPagarCita')).show();
+    }
+
+    async function confirmarPagoCita() {
+        const metodo_pago = document.getElementById('metodo_pago_cita').value;
+        const id_aseguradora = document.getElementById('aseguradora_pago_cita').value;
+
+        if (!metodo_pago) {
+            mostrarAlerta('Por favor selecciona un método de pago', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/pagos/pagar-cita-directa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id_cita: citaActualPago,
+                    metodo_pago: metodo_pago,
+                    id_aseguradora: id_aseguradora || null
+                })
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                mostrarAlerta(data.mensaje, 'danger');
+                return;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('modalPagarCita')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('modalDetalles')).hide();
+            mostrarAlerta(data.mensaje, 'success');
+            
+            setTimeout(() => cargarCitasDelMedico(), 1000);
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarAlerta('Error al procesar pago', 'danger');
         }
     }
 </script>

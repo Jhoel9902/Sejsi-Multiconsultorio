@@ -121,8 +121,8 @@ router.get('/horarios/personal/:id', requireAuth, requireRole(['admin']), async 
     const personal = personalData[0] || {};
 
     // Obtener horarios
-    const [horarios] = await pool.query('CALL sp_personal_horarios_disponibilidad(?)', [id]);
-    const horariosData = Array.isArray(horarios) ? horarios[0] : horarios || [];
+    const horariosCallData = await pool.query('CALL sp_personal_horarios_disponibilidad(?)', [id]);
+    const horariosData = horariosCallData[0][0] || [];
 
     res.json({ 
       success: true,

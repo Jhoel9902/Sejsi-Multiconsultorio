@@ -9,8 +9,8 @@ router.get('/pacientes', requireAuth, requireRole(['admin', 'ventanilla', 'medic
     const filtro = 'activos'; 
     const pagina = parseInt(req.query.pagina) || 1;
     const porPagina = 20;
-    const [pacientes] = await pool.query('CALL sp_pac_listar(?)', [filtro]);
-    const lista = Array.isArray(pacientes) ? pacientes[0] : pacientes;
+    const pacientesCallData = await pool.query('CALL sp_pac_listar(?)', [filtro]);
+    const lista = pacientesCallData[0][0];
     const totalPacientes = lista.length;
     const totalPaginas = Math.ceil(totalPacientes / porPagina);
     const paginaActual = Math.max(1, Math.min(pagina, totalPaginas));
@@ -38,8 +38,8 @@ router.get('/pacientes/buscar', requireAuth, requireRole(['admin', 'ventanilla',
     let pacientes = [];
     
     if (termino.trim().length > 0) {
-      const [result] = await pool.query('CALL sp_pac_buscar(?, ?)', [termino, true]);
-      pacientes = Array.isArray(result) ? result[0] : result;  
+      const resultCallData = await pool.query('CALL sp_pac_buscar(?, ?)', [termino, true]);
+      pacientes = resultCallData[0][0];  
       //paginacion de 50, creo que era 20 si no entonces que se quede así(alt + 161) para la í
       if (pacientes.length > 50) {
         pacientes = pacientes.slice(0, 50);
@@ -62,8 +62,8 @@ router.get('/pacientes/buscar', requireAuth, requireRole(['admin', 'ventanilla',
 router.get('/pacientes/obtener-detalles/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-    const pacientes = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+    const pacientes = resultCallData[0][0];
     if (!pacientes || pacientes.length === 0) {
       return res.status(404).send('Paciente no encontrado.');
     }
@@ -77,8 +77,8 @@ router.get('/pacientes/obtener-detalles/:id', requireAuth, requireRole(['admin',
 router.get('/pacientes/detalles/:id', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-    const pacientes = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+    const pacientes = resultCallData[0][0];
     if (!pacientes || pacientes.length === 0) {
       return res.status(404).render('error', { message: 'Paciente no encontrado.' });
     }
@@ -91,8 +91,8 @@ router.get('/pacientes/detalles/:id', requireAuth, requireRole(['admin', 'ventan
 
 router.get('/pacientes/crear', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   try {
-    const [result] = await pool.query('CALL sp_listar_aseguradoras()');
-    const aseguradoras = result && result.length > 0 ? result[0] : [];
+    const asegCallData = await pool.query('CALL sp_listar_aseguradoras()');
+    const aseguradoras = asegCallData[0][0];
     
     res.render('pacientes/crear', { user: req.user, error: null, formData: {}, aseguradoras });
   } catch (error) {
@@ -188,7 +188,7 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
   }
 
   try {
-    const [result] = await pool.query('CALL sp_pac_registrar(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_id, @p_codigo, @p_success, @p_msg)', [
+    const resultCallData = await pool.query('CALL sp_pac_registrar(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, @p_id, @p_codigo, @p_success, @p_msg)', [
       nombre,
       apellido_paterno,
       apellido_materno || null,
@@ -262,8 +262,8 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
 router.get('/pacientes/obtener-form/:id', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-    const pacientes = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+    const pacientes = resultCallData[0][0];
     if (!pacientes || pacientes.length === 0) {
       return res.status(404).send('Paciente no encontrado.');
     }
@@ -277,8 +277,8 @@ router.get('/pacientes/obtener-form/:id', requireAuth, requireRole(['admin', 've
 router.get('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
   const { id } = req.params;
   try {
-    const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-    const pacientes = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+    const pacientes = resultCallData[0][0];
     if (!pacientes || pacientes.length === 0) {
       return res.status(404).send('Paciente no encontrado.');
     }
@@ -383,8 +383,8 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
       return res.status(400).json({ success: false, mensaje: errors.join(' ') });
     }
     
-    const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-    const pacientes = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+    const pacientes = resultCallData[0][0];
     const paciente = pacientes[0];
     return res.status(400).render('pacientes/editar', {
       user: req.user,
@@ -427,8 +427,8 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
     if (output.success) {
       return res.redirect('/pacientes?success=Paciente actualizado exitosamente.');
     } else {
-      const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-      const pacientes = Array.isArray(result) ? result[0] : result;
+      const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+      const pacientes = resultCallData[0][0];
       const paciente = pacientes[0];
       return res.status(400).render('pacientes/editar', {
         user: req.user,
@@ -449,8 +449,8 @@ router.post('/pacientes/editar/:id', requireAuth, requireRole(['admin', 'ventani
     }
 
     try {
-      const [result] = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
-      const pacientes = Array.isArray(result) ? result[0] : result;
+      const resultCallData = await pool.query('CALL sp_pac_obtener_por_id(?)', [id]);
+      const pacientes = resultCallData[0][0];
       const paciente = pacientes[0];
       return res.status(err.code === 'ER_SIGNAL_EXCEPTION' ? 400 : 500).render('pacientes/editar', {
         user: req.user,

@@ -83,12 +83,12 @@ router.get('/citas-sin-historial/:id_paciente', requireAuth, requireRole(['medic
     try {
         const { id_paciente } = req.params;
 
-        const [citas] = await pool.query(
+        const citasResults = await pool.query(
             `CALL sp_historial_citas_sin_historial(?)`,
             [id_paciente]
         );
 
-        res.json(citas[0] || []);
+        res.json(citasResults[0][0] || []);
     } catch (error) {
         console.error('Error al obtener citas:', error);
         res.status(500).json({ success: false, mensaje: 'Error al obtener citas' });
@@ -138,12 +138,13 @@ router.get('/:id_paciente/listar', requireAuth, requireRole(['medico']), async (
     try {
         const { id_paciente } = req.params;
 
-        const [historiales] = await pool.query(
+        const historialesResults = await pool.query(
             `CALL sp_historial_listar_paciente(?)`,
             [id_paciente]
         );
 
-        res.json(Array.isArray(historiales) && historiales.length > 0 ? historiales[0] : []);
+        const historiales = historialesResults[0][0];
+        res.json(Array.isArray(historiales) && historiales.length > 0 ? historiales : []);
     } catch (error) {
         console.error('Error al listar historiales:', error);
         res.status(500).json({ success: false, mensaje: 'Error al listar historiales' });
@@ -155,24 +156,28 @@ router.get('/ver/:id_historial', requireAuth, requireRole(['medico']), async (re
     try {
         const { id_historial } = req.params;
 
-        const [historialResult] = await pool.query(
+        const historialResults = await pool.query(
             `CALL sp_historial_consultar(?)`,
             [id_historial]
         );
 
-        if (!historialResult || historialResult[0].length === 0) {
+        const historialResult = historialResults[0][0];
+
+        if (!historialResult || historialResult.length === 0) {
             return res.status(404).render('404', { user: req.user });
         }
 
         // Obtener estudios
-        const [estudios] = await pool.query(
+        const estudiosResults = await pool.query(
             `CALL sp_estudio_listar(?)`,
             [id_historial]
         );
 
+        const estudios = estudiosResults[0][0];
+
         res.render('historial/ver', {
             title: 'Detalles del Historial',
-            historial: historialResult[0][0],
+            historial: historialResult[0],
             estudios: (estudios && estudios[0]) ? estudios[0] : [],
             user: req.user
         });

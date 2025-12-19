@@ -7,8 +7,8 @@ const router = Router();
 // GET /especialidades - Listar especialidades (solo admin)
 router.get('/especialidades', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const [especialidades] = await pool.query('CALL sp_esp_listar()');
-    const lista = Array.isArray(especialidades) ? especialidades[0] : especialidades;
+    const resultCallData = await pool.query('CALL sp_esp_listar()');
+    const lista = resultCallData[0][0];
     
     res.render('especialidades/listar', { user: req.user, especialidades: lista, error: null });
   } catch (err) {
@@ -75,8 +75,8 @@ router.get('/especialidades/obtener/:id', requireAuth, requireRole(['admin']), a
   const { id } = req.params;
 
   try {
-    const [result] = await pool.query('CALL sp_esp_obtener_por_id(?)', [id]);
-    const rows = Array.isArray(result) ? result[0] : result;
+    const resultCallData = await pool.query('CALL sp_esp_obtener_por_id(?)', [id]);
+    const rows = resultCallData[0][0];
 
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: 'Especialidad no encontrada' });
@@ -145,8 +145,8 @@ router.get('/especialidades/asignar', requireAuth, requireRole(['admin']), async
     }
 
     // Obtener especialidades disponibles
-    const [especialidades] = await pool.query('CALL sp_esp_listar()');
-    const esps = Array.isArray(especialidades) ? especialidades[0] : especialidades;
+    const espsCallData = await pool.query('CALL sp_esp_listar()');
+    const esps = espsCallData[0][0];
 
     res.render('especialidades/asignar', { 
       user: req.user, 
