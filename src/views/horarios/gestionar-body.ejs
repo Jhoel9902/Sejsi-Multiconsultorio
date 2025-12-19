@@ -43,8 +43,16 @@
                 </div>
 
                 <div class="mb-3">
+                  <label class="form-label">Tipo de horario <span class="text-danger">*</span></label>
+                  <select id="tipoHorario" class="form-select" onchange="tipoHorarioChanged()">
+                    <option value="predefinido">Predefinido</option>
+                    <option value="personalizado">Personalizado</option>
+                  </select>
+                </div>
+
+                <div id="predefinidoContainer" class="mb-3">
                   <label for="selectHorario" class="form-label">Horario Predefinido <span class="text-danger">*</span></label>
-                  <select id="selectHorario" class="form-select" required>
+                  <select id="selectHorario" class="form-select">
                     <option value="">-- Seleccionar horario --</option>
                     <optgroup label="Lunes">
                       <% horarios.filter(h => h.dia_semana === 1).forEach(h => { %>
@@ -83,6 +91,31 @@
                     </optgroup>
                   </select>
                   <small class="text-muted d-block mt-1">Los horarios disponibles son predefinidos por el sistema.</small>
+                </div>
+
+                <div id="personalizadoContainer" style="display:none;">
+                  <label class="form-label">Horario Personalizado</label>
+                  <div class="row g-2">
+                    <div class="col-md-4">
+                      <select id="diaPersonalizado" class="form-select">
+                        <option value="">Seleccionar día</option>
+                        <option value="Lunes">Lunes</option>
+                        <option value="Martes">Martes</option>
+                        <option value="Miércoles">Miércoles</option>
+                        <option value="Jueves">Jueves</option>
+                        <option value="Viernes">Viernes</option>
+                        <option value="Sábado">Sábado</option>
+                        <option value="Domingo">Domingo</option>
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <input id="desdePersonalizado" type="time" class="form-control" step="3600" />
+                    </div>
+                    <div class="col-md-4">
+                      <input id="hastaPersonalizado" type="time" class="form-control" step="3600" />
+                    </div>
+                  </div>
+                  <small class="text-muted d-block mt-1">Si eliges personalizado, se creará (o reutilizará) un `thorario` en la base de datos usando procedimientos almacenados.</small>
                 </div>
 
                 <div class="mb-3">
@@ -377,24 +410,73 @@ function cargarHorarios() {
 }
 
 // Asignar horario
+function tipoHorarioChanged() {
+  const tipo = document.getElementById('tipoHorario').value;
+  document.getElementById('predefinidoContainer').style.display = tipo === 'predefinido' ? 'block' : 'none';
+  document.getElementById('personalizadoContainer').style.display = tipo === 'personalizado' ? 'block' : 'none';
+}
+
+function validarHoraSimple(hora) {
+  if (!hora) return false;
+  const [hh, mm] = hora.split(':').map(s => parseInt(s, 10));
+  if (isNaN(hh) || isNaN(mm)) return false;
+  if (mm !== 0) return false; // minutos solo 00
+  return hh;
+}
+
 function asignarHorario() {
   const idPersonal = document.getElementById('selectPersonal').value;
-  const idHorario = document.getElementById('selectHorario').value;
+  const tipo = document.getElementById('tipoHorario').value;
   const selectDescanso = document.getElementById('selectDescanso');
   let diaDescanso = selectDescanso.value;
 
-  if (!idPersonal || !idHorario) {
-    alert('Por favor selecciona personal y horario.');
+  if (!idPersonal) {
+    alert('Por favor selecciona personal.');
     return;
   }
 
+  // Validar día de descanso (si está bloqueado debe contener valor)
   if (selectDescanso.disabled) {
+    if (!selectDescanso.value) {
+      alert('Por favor selecciona un día de descanso.');
+      return;
+    }
     diaDescanso = selectDescanso.value;
   } else {
     if (!diaDescanso) {
       alert('Por favor selecciona un día de descanso.');
       return;
     }
+  }
+
+  let payload = { id_personal: idPersonal, dia_descanso: diaDescanso };
+
+  if (tipo === 'predefinido') {
+    const idHorario = document.getElementById('selectHorario').value;
+    if (!idHorario) { alert('Selecciona un horario predefinido'); return; }
+    payload.id_horario = idHorario;
+  } else {
+    const dia = document.getElementById('diaPersonalizado').value;
+    const desde = document.getElementById('desdePersonalizado').value;
+    const hasta = document.getElementById('hastaPersonalizado').value;
+
+    if (!dia) { alert('Selecciona un día para el horario personalizado'); return; }
+    if (!desde || !hasta) { alert('Ingresa desde y hasta'); return; }
+
+    const hhDesde = validarHoraSimple(desde);
+    const hhHasta = validarHoraSimple(hasta);
+
+    if (hhDesde === false) { alert('Desde inválido: minutos deben ser 00 y formato HH:MM'); return; }
+    if (hhHasta === false) { alert('Hasta inválido: minutos deben ser 00 y formato HH:MM'); return; }
+
+    if (!(hhDesde >= 8 && hhDesde <= 15)) { alert('Desde debe estar entre 08:00 y 15:00'); return; }
+    if (!(hhHasta >= 9 && hhHasta <= 16)) { alert('Hasta debe estar entre 09:00 y 16:00'); return; }
+    if (hhHasta <= hhDesde) { alert('Hasta debe ser mayor que Desde'); return; }
+
+    payload.personalizado = true;
+    payload.dia = dia;
+    payload.desde = desde;
+    payload.hasta = hasta;
   }
 
   const btnAsignar = document.getElementById('btnAsignar');
@@ -406,29 +488,44 @@ function asignarHorario() {
 
     fetch('/horarios/asignar', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id_personal: idPersonal,
-        id_horario: idHorario,
-        dia_descanso: diaDescanso
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload)
     })
-    .then(res => res.json())
+    .then(res => {
+      if (!res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return res.json().then(err => { throw new Error(err.mensaje || err.error || JSON.stringify(err)); });
+        }
+        return res.text().then(text => { throw new Error(text || ('Error en la solicitud (status ' + res.status + ')')); });
+      }
+      return res.json();
+    })
     .then(data => {
       btnAsignar.disabled = false;
       btnAsignar.innerHTML = btnText;
-      
+
       if (data.success) {
+        // Mostrar mensaje y limpiar campos
         alert(data.mensaje);
-        document.getElementById('selectHorario').value = '';
+        document.getElementById('selectHorario') && (document.getElementById('selectHorario').value = '');
+        document.getElementById('diaPersonalizado') && (document.getElementById('diaPersonalizado').value = '');
+        document.getElementById('desdePersonalizado') && (document.getElementById('desdePersonalizado').value = '');
+        document.getElementById('hastaPersonalizado') && (document.getElementById('hastaPersonalizado').value = '');
         cargarHorarios();
       } else {
-        alert('Error: ' + data.mensaje);
+        alert('Error: ' + (data.mensaje || 'Respuesta inválida del servidor'));
       }
     })
     .catch(err => {
       btnAsignar.disabled = false;
       btnAsignar.innerHTML = btnText;
+      // Mostrar error con más detalle
+      console.error('Error asignando horario:', err);
       alert('Error: ' + err.message);
     });
   })();
