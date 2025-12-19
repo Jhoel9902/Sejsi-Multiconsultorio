@@ -5,7 +5,7 @@ dotenv.config();
 export const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || '',
+  password: process.env.DB_PASS || 'demon123',
   database: process.env.DB_NAME || 'multiconsultorio',
   waitForConnections: true,
   connectionLimit: 10,
