@@ -216,7 +216,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
         error: null,
         success: 'Personal registrado exitosamente.',
         especialidades: [],
-        roles: []
+        roles: [],
+        formData: {}
       });
     } else {
       return res.status(400).render('personal/registrar', {
@@ -224,7 +225,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
         error: output.mensaje,
         success: null,
         especialidades: especialidadesDisponibles,
-        roles: rolesData
+        roles: rolesData,
+        formData: req.body
       });
     }
   } catch (err) {
@@ -234,7 +236,8 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
       error: 'Error al registrar personal. Intente nuevamente.',
       success: null,
       especialidades: especialidadesDisponibles,
-      roles: rolesData
+      roles: rolesData,
+      formData: req.body
     });
   }
 });
