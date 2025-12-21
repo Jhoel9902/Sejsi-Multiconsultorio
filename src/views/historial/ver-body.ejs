@@ -114,14 +114,9 @@
                                                 <small class="text-muted d-block mb-2">
                                                     <%= new Date(estudio.fecha_subida).toLocaleDateString('es-ES') %>
                                                 </small>
-                                                <div class="btn-group btn-group-sm w-100">
-                                                    <a href="<%= estudio.foto %>" class="btn btn-info" target="_blank">
-                                                        <i class="bi bi-download"></i> Descargar
-                                                    </a>
-                                                    <button type="button" class="btn btn-danger" onclick="eliminarEstudio('<%= estudio.id_estudio %>')">
-                                                        <i class="bi bi-trash"></i> Eliminar
-                                                    </button>
-                                                </div>
+                                                <button type="button" class="btn btn-info btn-sm w-100" onclick="verEstudio('<%= estudio.foto %>', '<%= estudio.nombre_estudio %>')">
+                                                    <i class="bi bi-eye"></i> Ver
+                                                </button>
                                             </div>
                                         </div>
                                     <% }); %>
@@ -290,27 +285,64 @@ document.getElementById('formSubirEstudio').addEventListener('submit', async (e)
     }
 });
 
-// Eliminar estudio
-async function eliminarEstudio(idEstudio) {
-    if (!confirm('¿Eliminar este estudio?')) return;
+// Ver estudio en modal
+function verEstudio(rutaArchivo, nombreEstudio) {
+    // Verificar si es una imagen o PDF
+    const esImagen = /\.(jpg|jpeg|png|gif|webp)$/i.test(rutaArchivo);
+    const esPDF = /\.pdf$/i.test(rutaArchivo);
     
-    try {
-        const response = await fetch(`/historial/${idHistorial}/estudios/${idEstudio}`, {
-            method: 'DELETE'
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            document.querySelector(`[data-id="${idEstudio}"]`).remove();
-            alert('Estudio eliminado');
-        } else {
-            alert('Error: ' + data.mensaje);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al eliminar');
+    let contenido = '';
+    
+    if (esImagen) {
+        contenido = `<img src="${rutaArchivo}" alt="${nombreEstudio}" style="max-width: 100%; height: auto;">`;
+    } else if (esPDF) {
+        contenido = `
+            <div style="width: 100%; height: 500px; border: 1px solid #ddd;">
+                <iframe src="${rutaArchivo}" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
+        `;
+    } else {
+        contenido = `<p class="text-muted">Archivo no soportado para previsualización. <a href="${rutaArchivo}" target="_blank" download>Descargar</a></p>`;
     }
+    
+    // Crear modal dinámico
+    const modalHTML = `
+        <div class="modal fade" id="modalEstudio" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${nombreEstudio}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${contenido}
+                    </div>
+                    <div class="modal-footer">
+                        <a href="${rutaArchivo}" class="btn btn-primary" download>
+                            <i class="bi bi-download"></i> Descargar
+                        </a>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remover modal anterior si existe
+    const modalAnterior = document.getElementById('modalEstudio');
+    if (modalAnterior) {
+        modalAnterior.remove();
+    }
+    
+    // Agregar y mostrar modal
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    const modal = new bootstrap.Modal(document.getElementById('modalEstudio'));
+    modal.show();
+    
+    // Limpiar al cerrar
+    document.getElementById('modalEstudio').addEventListener('hidden.bs.modal', function() {
+        this.remove();
+    });
 }
 
 // =============== RECETAS ===============

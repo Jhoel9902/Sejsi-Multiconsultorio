@@ -1,7 +1,7 @@
 <div class="row justify-content-center">
     <div class="col-lg-8">
         <div class="card shadow-lg">
-            <div class="card-header bg-danger text-white">
+            <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="bi bi-calendar-plus me-2"></i>Agendar Nueva Cita</h5>
             </div>
             <div class="card-body">
@@ -61,15 +61,15 @@
                         <!-- Fecha de Cita -->
                         <div class="col-md-6 mb-3">
                             <label for="fecha_cita" class="form-label">Fecha de Cita *</label>
-                            <input type="text" class="form-control" id="fecha_cita" name="fecha_cita" placeholder="DD/MM/YYYY" required>
-                            <small class="text-muted">Formato: DD/MM/YYYY (ej: 25/12/2025)</small>
+                            <input type="text" class="form-control" id="fecha_cita" name="fecha_cita" placeholder="Selecciona una fecha" required>
+                            <small class="text-muted">Haz clic para seleccionar una fecha del calendario</small>
                         </div>
 
                         <!-- Hora de Cita -->
                         <div class="col-md-6 mb-3">
                             <label for="hora_cita" class="form-label">Hora de Cita *</label>
-                            <input type="text" class="form-control" id="hora_cita" name="hora_cita" placeholder="HH:MM" required>
-                            <small class="text-muted">Formato: HH:MM (ej: 14:30)</small>
+                            <input type="text" class="form-control" id="hora_cita" name="hora_cita" placeholder="Selecciona una hora" required>
+                            <small class="text-muted">Haz clic para seleccionar una hora</small>
                         </div>
 
                         <!-- Motivo de Consulta -->
@@ -88,7 +88,7 @@
 
                         <!-- Botones -->
                         <div class="col-md-12 mb-3">
-                            <button type="submit" class="btn btn-danger btn-sm w-100">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
                                 <i class="bi bi-check-circle me-2"></i>Agendar Cita
                             </button>
                         </div>
@@ -102,9 +102,9 @@
                 <div class="modal fade" id="modalAlternativas" tabindex="-1">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
-                            <div class="modal-header bg-warning">
+                            <div class="modal-header bg-info text-white">
                                 <h5 class="modal-title">Horarios Alternativos Disponibles</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
                                 <p class="text-muted">El horario seleccionado no está disponible. Aquí hay alternativas:</p>
@@ -117,9 +117,29 @@
                     </div>
                 </div>
 
+                <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
                 <script>
                     const medicosList = <%- JSON.stringify(medicos) %>;
                     let selectedPacienteId = null;
+
+                    // Inicializar date picker para la fecha de cita
+                    flatpickr('#fecha_cita', {
+                        dateFormat: 'd/m/Y',
+                        minDate: 'today',
+                        locale: 'es',
+                        disableMobile: true
+                    });
+
+                    // Inicializar time picker para la hora de cita
+                    flatpickr('#hora_cita', {
+                        enableTime: true,
+                        noCalendar: true,
+                        dateFormat: 'H:i',
+                        time_24hr: true,
+                        locale: 'es',
+                        disableMobile: true,
+                        minuteIncrement: 15
+                    });
 
                     // Búsqueda de pacientes
                     const pacienteSearch = document.getElementById('paciente-search');

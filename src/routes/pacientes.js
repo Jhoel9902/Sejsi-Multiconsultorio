@@ -122,6 +122,15 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     numero_poliza,
   } = req.body;
 
+  // Obtener aseguradoras para la vista
+  let aseguradoras = [];
+  try {
+    const asegCallData = await pool.query('CALL sp_listar_aseguradoras()');
+    aseguradoras = asegCallData[0][0] || [];
+  } catch (err) {
+    console.error('Error al cargar aseguradoras:', err);
+  }
+
   const errors = [];
 
   if (!nombre || nombre.trim() === '') {
@@ -184,6 +193,7 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
       error: errors.join(' '),
       //ahora para los vagos que no quieren llenar todo de nuevo jeje
       formData: req.body,
+      aseguradoras,
     });
   }
 
@@ -244,6 +254,8 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
       return res.status(400).render('pacientes/crear', {
         user: req.user,
         error: output.mensaje,
+        formData: req.body,
+        aseguradoras,
       });
     }
   } catch (err) {
@@ -255,6 +267,8 @@ router.post('/pacientes', requireAuth, requireRole(['admin', 'ventanilla']), asy
     return res.status(500).render('pacientes/crear', {
       user: req.user,
       error: errorMessage,
+      formData: req.body,
+      aseguradoras,
     });
   }
 });

@@ -244,8 +244,10 @@ router.post('/personal', requireAuth, requireRole(['admin']), uploadPersonal.any
 
 router.get('/personal/gestionar', requireAuth, requireRole(['admin']), async (req, res) => {
   try {
-    const resultCallData = await pool.query('CALL sp_personal_listar()');
-    const personal = resultCallData[0][0];
+    // Obtener solo personal activo (estado = 1)
+    const [personal] = await pool.query(
+      'SELECT p.id_personal, p.ci, p.nombres, p.apellido_paterno, p.apellido_materno, p.cargo, p.estado, r.nombre_rol, p.correo, p.celular FROM tpersonal p LEFT JOIN trol r ON p.id_rol = r.id_rol WHERE p.estado = 1 ORDER BY p.nombres ASC'
+    );
 
     res.render('personal/gestionar', { user: req.user, personal });
   } catch (err) {
@@ -506,6 +508,37 @@ router.get('/personal/contratos', requireAuth, requireRole(['admin']), async (re
       personalContratos: [],
       error: 'Error al cargar los contratos.'
     });
+  }
+});
+
+// POST /personal/eliminar/:id - Eliminar personal (borrado lógico)
+router.post('/personal/eliminar/:id', requireAuth, requireRole(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar que el personal existe
+    const [[personalActual]] = await pool.query(
+      'SELECT id_personal FROM tpersonal WHERE id_personal = ?',
+      [id]
+    );
+    
+    if (!personalActual) {
+      return res.status(404).json({ success: false, mensaje: 'Personal no encontrado' });
+    }
+    
+    // Desactivar personal (borrado lógico) - cambiar estado a 0
+    await pool.query(
+      'UPDATE tpersonal SET estado = 0 WHERE id_personal = ?',
+      [id]
+    );
+    
+    res.json({ 
+      success: true, 
+      mensaje: 'Personal eliminado correctamente'
+    });
+  } catch (error) {
+    console.error('Error al eliminar personal:', error);
+    res.status(500).json({ success: false, mensaje: 'Error al eliminar' });
   }
 });
 

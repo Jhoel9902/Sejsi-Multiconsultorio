@@ -124,7 +124,7 @@ router.get('/especialidades/asignar', requireAuth, requireRole(['admin']), async
   try {
     // Obtener médicos con sus especialidades (como objetos, no concatenados)
     const [medicos] = await pool.query(`
-      SELECT p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.foto_perfil
+      SELECT p.id_personal, p.nombres, p.apellido_paterno, p.apellido_materno, p.foto_perfil, p.ci
       FROM tpersonal p
       WHERE p.id_rol = (SELECT id_rol FROM trol WHERE nombre_rol = 'medico') AND p.estado = TRUE
       ORDER BY p.nombres ASC

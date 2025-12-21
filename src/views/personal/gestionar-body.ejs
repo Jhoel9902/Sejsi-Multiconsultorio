@@ -63,10 +63,10 @@
                       <button 
                         type="button" 
                         class="btn btn-sm btn-outline-danger"
-                        onclick="toggleEstadoPersonal('<%= p.id_personal %>', <%= p.estado %>)"
-                        title="<%= p.estado ? 'Desactivar' : 'Activar' %>"
+                        onclick="eliminarPersonal('<%= p.id_personal %>', '<%= p.nombres %> <%= p.apellido_paterno %>')"
+                        title="Eliminar"
                       >
-                        <i class="bi <%= p.estado ? 'bi-toggle-on' : 'bi-toggle-off' %>"></i>
+                        <i class="bi bi-trash"></i>
                       </button>
                     </td>
                   </tr>
@@ -136,10 +136,25 @@
       .catch(err => alert('Error al actualizar personal'));
   }
 
-  function toggleEstadoPersonal(id, estadoActual) {
-    if (confirm(`¿Estás seguro de que deseas ${estadoActual ? 'desactivar' : 'activar'} este personal?`)) {
-      // Pendiente: implementar SP para toggle estado
-      alert('Funcionalidad próximamente...');
+  function eliminarPersonal(id, nombre) {
+    if (confirm(`¿Estás seguro de que deseas eliminar a ${nombre}?`)) {
+      fetch(`/personal/eliminar/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          // Remover la fila de la tabla
+          location.reload();
+        } else {
+          alert('Error: ' + data.mensaje);
+        }
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        alert('Error al eliminar');
+      });
     }
   }
 </script>

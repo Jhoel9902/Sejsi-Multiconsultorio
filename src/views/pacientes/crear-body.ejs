@@ -28,7 +28,6 @@
             <div class="col-md-6">
               <label class="form-label">Fecha de nacimiento <span class="text-danger">*</span></label>
               <input type="date" class="form-control" name="fecha_nacimiento" value="<%= formData?.fecha_nacimiento || '' %>" required />
-              <small class="form-text text-muted">Debe ser menor de 100 años</small>
             </div>
 
             <!-- Documentos y contacto -->
@@ -76,12 +75,12 @@
                 <option value="Casado/a" <%= formData?.estado_civil === 'Casado/a' ? 'selected' : '' %>>Casado/a</option>
                 <option value="Divorciado/a" <%= formData?.estado_civil === 'Divorciado/a' ? 'selected' : '' %>>Divorciado/a</option>
                 <option value="Viudo/a" <%= formData?.estado_civil === 'Viudo/a' ? 'selected' : '' %>>Viudo/a</option>
-                <option value="Unión libre" <%= formData?.estado_civil === 'Unión libre' ? 'selected' : '' %>>Unión libre</option>
               </select>
             </div>
             <div class="col-md-4">
               <label class="form-label">Contacto de emergencia</label>
-              <input type="text" class="form-control" name="contacto_emerg" value="<%= formData?.contacto_emerg || '' %>" placeholder="Nombre y teléfono" />
+              <input type="text" class="form-control" id="contacto_emerg" name="contacto_emerg" value="<%= formData?.contacto_emerg || '' %>" placeholder="Ej: Maria - 78856765" title="Formato: Nombre - Número (máximo 20 dígitos)" />
+              <small class="form-text text-muted d-block mt-1">Formato: Nombre - Número (ej: Maria - 78856765)</small>
             </div>
 
             <!-- Domicilio -->
@@ -140,3 +139,63 @@
     </div>
   </div>
 </div>
+
+<script>
+  // Validación del campo "Contacto de emergencia"
+  document.getElementById('contacto_emerg').addEventListener('blur', function() {
+    const valor = this.value.trim();
+    
+    if (valor === '') {
+      // Campo vacío es permitido (no obligatorio)
+      this.classList.remove('is-invalid');
+      return;
+    }
+    
+    // Validar formato: "Nombre - Número"
+    const regex = /^([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+)\s*-\s*(\d{8,14})$/;
+    
+    if (!regex.test(valor)) {
+      this.classList.add('is-invalid');
+      
+      // Agregar mensaje de error si no existe
+      let errorMsg = this.nextElementSibling?.classList.contains('invalid-feedback');
+      if (!errorMsg) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'invalid-feedback d-block';
+        feedbackDiv.textContent = 'Formato inválido. Use: Nombre - Número (ej: Maria - 78856765)';
+        this.parentNode.insertBefore(feedbackDiv, this.nextElementSibling);
+      }
+    } else {
+      this.classList.remove('is-invalid');
+      // Remover mensaje de error si existe
+      if (this.nextElementSibling?.classList.contains('invalid-feedback')) {
+        this.nextElementSibling.remove();
+      }
+    }
+  });
+  
+  // Validación al enviar el formulario
+  document.querySelector('form.needs-validation').addEventListener('submit', function(e) {
+    const contactoEmerg = document.getElementById('contacto_emerg');
+    const valor = contactoEmerg.value.trim();
+    
+    if (valor !== '') {
+      const regex = /^([a-zA-ZáéíóúñÁÉÍÓÚÑ\s]+)\s*-\s*(\d{8,14})$/;
+      
+      if (!regex.test(valor)) {
+        e.preventDefault();
+        e.stopPropagation();
+        contactoEmerg.classList.add('is-invalid');
+        contactoEmerg.focus();
+        
+        if (!contactoEmerg.nextElementSibling?.classList.contains('invalid-feedback')) {
+          const feedbackDiv = document.createElement('div');
+          feedbackDiv.className = 'invalid-feedback d-block';
+          feedbackDiv.textContent = 'Formato inválido. Use: Nombre - Número (ej: Maria - 78856765)';
+          contactoEmerg.parentNode.insertBefore(feedbackDiv, contactoEmerg.nextElementSibling);
+        }
+        return false;
+      }
+    }
+  });
+</script>

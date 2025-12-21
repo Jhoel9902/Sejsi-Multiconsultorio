@@ -189,6 +189,10 @@ router.post('/citas', requireAuth, requireRole(['admin', 'ventanilla']), async (
 
         const aseguradorasList = (aseguradorasResults[0][0]) || [];
 
+        // Determinar redirección según rol del usuario
+        // Admin va a agenda, ventanilla va a pagos
+        const redirect = req.user.nombre_rol === 'admin' ? '/citas/agenda' : '/pagos';
+
         res.json({
             success: true,
             mensaje: 'Cita creada exitosamente',
@@ -197,7 +201,7 @@ router.post('/citas', requireAuth, requireRole(['admin', 'ventanilla']), async (
             id_paciente: id_paciente,
             id_servicio: id_servicio,
             aseguradoras: aseguradorasList,
-            redirect: '/pagos'
+            redirect: redirect
         });
     } catch (error) {
         console.error('Error al crear cita:', error);

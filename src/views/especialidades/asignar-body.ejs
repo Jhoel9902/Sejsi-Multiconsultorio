@@ -13,10 +13,27 @@
     </div>
   <% } %>
 
+  <!-- Buscador -->
+  <div class="row mb-4">
+    <div class="col-12 col-md-6">
+      <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input 
+          type="text" 
+          class="form-control" 
+          id="medicoFilter" 
+          placeholder="Busca por nombre o CI..."
+          autocomplete="off"
+        />
+      </div>
+      <small class="text-muted d-block mt-2">Filtra los médicos por nombre o cédula de identidad</small>
+    </div>
+  </div>
+
   <div class="row">
     <% if (medicos && medicos.length > 0) { %>
       <% medicos.forEach(medico => { %>
-        <div class="col-12 col-lg-6 mb-4">
+        <div class="col-12 col-lg-6 mb-4 medico-card" data-nombre="<%= medico.nombres %> <%= medico.apellido_paterno %>" data-ci="<%= medico.ci %>">
           <div class="card h-100">
             <div class="card-header bg-light">
               <div class="d-flex align-items-center gap-3">
@@ -27,7 +44,7 @@
                 <% } %>
                 <div>
                   <h5 class="mb-0"><%= medico.nombres %> <%= medico.apellido_paterno %></h5>
-                  <small class="text-muted">ID: <%= medico.id_personal %></small>
+                  <small class="text-muted">CI: <%= medico.ci %></small>
                 </div>
               </div>
             </div>
@@ -154,4 +171,22 @@
         console.error(err);
       });
   }
+
+  // Filtrar médicos por nombre o CI
+  document.getElementById('medicoFilter').addEventListener('keyup', function() {
+    const filtro = this.value.toLowerCase().trim();
+    const cards = document.querySelectorAll('.medico-card');
+    
+    cards.forEach(card => {
+      const nombre = card.dataset.nombre.toLowerCase();
+      const ci = card.dataset.ci.toLowerCase();
+      
+      // Mostrar card si coincide con el nombre o CI
+      if (nombre.includes(filtro) || ci.includes(filtro)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
 </script>

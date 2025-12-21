@@ -173,7 +173,7 @@ router.get('/ver/:id_historial', requireAuth, requireRole(['medico']), async (re
             [id_historial]
         );
 
-        const estudios = estudiosResults[0][0];
+        const estudios = estudiosResults[0] || [];
 
         res.render('historial/ver', {
             title: 'Detalles del Historial',
