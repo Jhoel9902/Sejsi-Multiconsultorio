@@ -510,37 +510,12 @@ router.get('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['venta
 });
 
 // POST /citas/:id_cita/marcar-asistencia - Marcar cita como completada
-router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admin', 'ventanilla']), async (req, res) => {
+router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admin', 'ventanilla', 'medico']), async (req, res) => {
     try {
         const { id_cita } = req.params;
         const { id_aseguradora } = req.body;
 
-        // Primero obtener datos de la cita
-        const citaResults = await pool.query(
-            'CALL sp_cita_obtener_para_marcar_asistencia(?)',
-            [id_cita]
-        );
-        
-        const citaArray = citaResults[0][0] || [];
-        if (!citaArray || citaArray.length === 0) {
-            return res.status(404).json({ success: false, mensaje: 'Cita no encontrada' });
-        }
-        const cita = citaArray[0];
-
-        // VALIDAR QUE LA CITA ESTÉ PAGADA
-        const [[pagado]] = await pool.query(
-            'SELECT COUNT(*) as cantidad FROM tfactura_cliente WHERE id_cita = ? AND estado = 1 AND metodo_pago IS NOT NULL',
-            [id_cita]
-        );
-
-        if (!pagado.cantidad || pagado.cantidad === 0) {
-            return res.status(400).json({ 
-                success: false, 
-                mensaje: 'La cita no ha sido pagada. Debe registrar un pago antes de marcar asistencia' 
-            });
-        }
-
-        // Marcar como completada
+        // Marcar como completada (el SP hace todas las validaciones)
         await pool.query(
             'CALL sp_cita_marcar_asistencia(?, @p_success, @p_mensaje)',
             [id_cita]
@@ -552,25 +527,36 @@ router.post('/citas/:id_cita/marcar-asistencia', requireAuth, requireRole(['admi
             return res.status(400).json({ success: false, mensaje: result.mensaje });
         }
 
-        // Si tiene aseguradora seleccionada, crear factura de aseguradora
-        if (id_aseguradora) {
-            // Obtener datos de aseguradora
-            const [aseguradoraData] = await pool.query(
-                'SELECT porcentaje_cobertura FROM taseguradora WHERE id_aseguradora = ? AND estado = 1',
-                [id_aseguradora]
-            );
+        // Obtener datos de la cita para la factura
+        const citaResults = await pool.query(
+            'CALL sp_cita_obtener_para_marcar_asistencia(?)',
+            [id_cita]
+        );
+        
+        const citaArray = citaResults[0][0] || [];
+        if (citaArray.length > 0) {
+            const cita = citaArray[0];
 
-            if (aseguradoraData && aseguradoraData.length > 0) {
-                const aseguradora = aseguradoraData[0];
-                const porcentajeCobertura = aseguradora.porcentaje_cobertura;
-                
-                console.log(`Creando factura de aseguradora - Total: ${cita.precio_servicio}, Cobertura: ${porcentajeCobertura}%`);
-                
-                // Crear factura aseguradora
-                await pool.query(
-                    'CALL sp_crear_factura_aseguradora(?, ?, ?, ?, ?, @p_id_fa, @p_success_fa, @p_msg_fa)',
-                    [id_cita, id_aseguradora, cita.precio_servicio, porcentajeCobertura, cita.id_servicio]
+            // Si tiene aseguradora seleccionada, crear factura de aseguradora
+            if (id_aseguradora) {
+                // Obtener datos de aseguradora
+                const [aseguradoraData] = await pool.query(
+                    'SELECT porcentaje_cobertura FROM taseguradora WHERE id_aseguradora = ? AND estado = 1',
+                    [id_aseguradora]
                 );
+
+                if (aseguradoraData && aseguradoraData.length > 0) {
+                    const aseguradora = aseguradoraData[0];
+                    const porcentajeCobertura = aseguradora.porcentaje_cobertura;
+                    
+                    console.log(`Creando factura de aseguradora - Total: ${cita.precio_servicio}, Cobertura: ${porcentajeCobertura}%`);
+                    
+                    // Crear factura aseguradora
+                    await pool.query(
+                        'CALL sp_crear_factura_aseguradora(?, ?, ?, ?, ?, @p_id_fa, @p_success_fa, @p_msg_fa)',
+                        [id_cita, id_aseguradora, cita.precio_servicio, porcentajeCobertura, cita.id_servicio]
+                    );
+                }
             }
         }
 

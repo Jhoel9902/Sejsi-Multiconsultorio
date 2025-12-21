@@ -552,7 +552,7 @@ router.get('/pagos/buscar-por-fechas', requireAuth, requireRole(['ventanilla']),
 });
 
 // POST /pagos/pagar-cita-directa - Pagar cita directamente (crear factura y registrar pago)
-router.post('/pagos/pagar-cita-directa', requireAuth, requireRole(['ventanilla']), async (req, res) => {
+router.post('/pagos/pagar-cita-directa', requireAuth, requireRole(['ventanilla', 'admin']), async (req, res) => {
     try {
         let { id_cita, metodo_pago, id_aseguradora } = req.body;
 

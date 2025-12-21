@@ -1204,4 +1204,15 @@
             mostrarAlerta('Error al procesar pago', 'danger');
         }
     }
+
+    function mostrarAlerta(mensaje, tipo = 'danger') {
+        const alertasDiv = document.getElementById('alertas');
+        alertasDiv.innerHTML = `
+            <div class="alert alert-${tipo} alert-dismissible fade show" role="alert">
+                <i class="bi bi-${tipo === 'success' ? 'check-circle' : tipo === 'warning' ? 'exclamation-circle' : 'exclamation-triangle'} me-2"></i>
+                ${mensaje}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
 </script>

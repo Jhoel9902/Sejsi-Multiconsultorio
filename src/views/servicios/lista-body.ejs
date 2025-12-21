@@ -10,16 +10,6 @@
                     </a>
                 </div>
                 <div class="card-body">
-                    <!-- Filtros -->
-                    <div class="mb-3">
-                        <a href="/servicios?filtro=activos" class="btn btn-sm <%= filtroActual === 'activos' ? 'btn-info active' : 'btn-outline-info' %>">
-                            <i class="bi bi-check-circle"></i> Activos
-                        </a>
-                        <a href="/servicios?filtro=todos" class="btn btn-sm <%= filtroActual === 'todos' ? 'btn-secondary active' : 'btn-outline-secondary' %>">
-                            <i class="bi bi-list"></i> Todos
-                        </a>
-                    </div>
-
                     <!-- Tabla de servicios -->
                     <div class="table-responsive">
                         <table class="table table-striped table-hover">
@@ -28,7 +18,6 @@
                                     <th>Nombre</th>
                                     <th>Precio</th>
                                     <th>Descripción</th>
-                                    <th>Estado</th>
                                     <th>Acciones</th>
                                 </tr>
                             </thead>
@@ -44,28 +33,18 @@
                                             </td>
                                             <td><small><%= servicio.descripcion ? servicio.descripcion.substring(0, 50) + '...' : 'N/A' %></small></td>
                                             <td>
-                                                <% if (servicio.estado === 1) { %>
-                                                    <span class="badge bg-success">Activo</span>
-                                                <% } else { %>
-                                                    <span class="badge bg-danger">Inactivo</span>
-                                                <% } %>
-                                            </td>
-                                            <td>
                                                 <a href="/servicios/consultar/<%= servicio.id_servicio %>" class="btn btn-sm btn-info" title="Ver">
                                                     <i class="bi bi-eye"></i>
                                                 </a>
                                                 <a href="/servicios/editar/<%= servicio.id_servicio %>" class="btn btn-sm btn-warning" title="Editar">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
-                                                <button class="btn btn-sm btn-danger" onclick="toggleEstado('<%= servicio.id_servicio %>')" title="Cambiar estado">
-                                                    <i class="bi bi-toggle-on"></i>
-                                                </button>
                                             </td>
                                         </tr>
                                     <% }); %>
                                 <% } else { %>
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted">No hay servicios registrados</td>
+                                        <td colspan="4" class="text-center text-muted">No hay servicios registrados</td>
                                     </tr>
                                 <% } %>
                             </tbody>
@@ -76,26 +55,6 @@
         </div>
     </div>
 </div>
-
 <script>
-async function toggleEstado(id) {
-    if (!confirm('¿Cambiar estado del servicio?')) return;
-
-    try {
-        const response = await fetch(`/servicios/toggle-estado/${id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await response.json();
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + data.mensaje);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al cambiar estado');
-    }
-}
+// Script removed - no toggleEstado function needed
 </script>
